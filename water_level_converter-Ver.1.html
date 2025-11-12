@@ -1,0 +1,1073 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>水位・標高 変換ツール</title>
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>💧</text></svg>">
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin=""/>
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        
+        html, body {
+            height: 100%;
+            overflow: hidden;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Helvetica', Arial, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            padding: 3px;
+            color: #1a1a1a;
+        }
+        
+        .container {
+            max-width: 98vw;
+            height: calc(100% - 6px);
+            margin: 0 auto;
+            background: white;
+            border-radius: 16px;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+            overflow: hidden;
+            display: flex; 
+            flex-direction: column; 
+        }
+        
+        .header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 5px 20px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 25px;
+            flex-shrink: 0; 
+        }
+
+        .header-content {
+            display: flex;
+            align-items: baseline;
+            gap: 20px;
+            flex-wrap: wrap;
+        }
+
+        .header-content h1 { font-size: 1.8em; font-weight: 700; letter-spacing: -0.5px; margin-bottom: 0; white-space: nowrap; }
+        .header-content p { font-size: 0.9em; opacity: 0.95; line-height: 1.6; margin: 0; white-space: nowrap; }
+        
+        .header-actions { display: flex; gap: 10px; align-items: center; }
+        .btn-header {
+            padding: 8px 16px; border-radius: 8px; font-size: 0.9em;
+            font-weight: 600; cursor: pointer; transition: all 0.2s;
+            border: 2px solid rgba(255,255,255,0.7); background: transparent; color: white;
+        }
+        .btn-header:hover { background: rgba(255,255,255,0.2); transform: translateY(-1px); }
+
+        .content { padding: 10px; flex-grow: 1; overflow: hidden; }
+        
+        .section {
+            background: #f8f9fa; border-radius: 12px;
+            padding: 2px 10px 10px 10px;
+            border: 1px solid #e9ecef;
+        }
+        
+        .section h2 {
+            font-size: 1.3em; font-weight: 600; margin-bottom: 5px;
+            color: #667eea; display: flex; align-items: center; gap: 8px;
+        }
+        .section-description { color: #6c757d; font-size: 0.95em; margin-bottom: 5px; line-height: 1.5; }
+        .form-group { display: flex; flex-direction: column; gap: 2px; margin-bottom: 3px; }
+        label { font-weight: 600; margin-bottom: 2px; font-size: 0.9em; color: #495057; display: flex; align-items: center; gap: 4px; }
+        .required-mark { color: #dc3545; margin-left: 3px; }
+        
+        input[type="text"], input[type="number"], select, textarea {
+            width: 100%;
+            padding: 10px 12px; border: 2px solid #e9ecef;
+            border-radius: 8px; font-size: 1em;
+            transition: all 0.2s; font-family: inherit;
+        }
+        input[type="text"]:focus, input[type="number"]:focus, select:focus, textarea:focus {
+            outline: none; border-color: #667eea;
+            box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+        }
+        textarea { resize: vertical; min-height: 100px; font-family: monospace; }
+        
+        .btn {
+            padding: 7px 20px; border: none; border-radius: 8px;
+            font-size: 1em; font-weight: 600; cursor: pointer;
+            transition: all 0.2s; width: 100%;
+        }
+        .btn-primary {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white; margin-top: 5px;
+        }
+        .btn-primary:hover { transform: translateY(-2px); box-shadow: 0 8px 20px rgba(102, 126, 234, 0.4); }
+        .btn-secondary { background: #6c757d; color: white; }
+        .btn-secondary:hover { background: #5a6268; transform: translateY(-2px); }
+        
+        .button-group { display: flex; gap: 10px; margin-top: 5px; }
+        .button-group .btn { width: auto; flex: 1; margin-top: 0; }
+        .btn-info { background: #17a2b8; color: white; }
+        .btn-info:hover { background: #138496; transform: translateY(-2px); box-shadow: 0 8px 20px rgba(23, 162, 184, 0.4); }
+        .history-panel-header .button-group .btn { font-size: 0.9em; white-space: nowrap; }
+        
+        table { width: 100%; border-collapse: collapse; background: white; border-radius: 8px; overflow: hidden; box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1); }
+        th { background-color: #495057; color: white; padding: 8px; text-align: center; font-weight: 600; }
+        td { padding: 8px; text-align: center; border-bottom: 1px solid #e9ecef; vertical-align: middle; }
+        tr:last-child td { border-bottom: none; }
+        tr:nth-child(even) { background-color: #f8f9fa; }
+        #result-table th, #result-table td { padding: 5px; }
+        #result-table th:not(:last-child), #result-table td:not(:last-child) { border-right: 1px solid #dee2e6; }
+        .highlight-current { background-color: #e7f3ff !important; border-left: 4px solid #007bff; }
+        .highlight-location { background-color: #d4edda !important; border-left: 4px solid #28a745; }
+        .el-value { font-weight: 700; color: #dc3545; }
+
+        .graph-container {
+            display: flex;
+            margin-top: 15px;
+            padding: 0 15px 15px 15px;
+            background: white;
+            border-radius: 12px;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+            align-items: stretch; 
+            flex: 1; 
+            min-height: 0;
+        }
+        .y-axis { display: flex; flex-direction: column; justify-content: space-between; position: relative; flex-shrink: 0; font-size: 0.85em; color: #495057; }
+        .y-axis.left { width: 60px; text-align: right; padding-right: 5px; }
+        .y-axis.right { width: 80px; text-align: left; padding-left: 5px; }
+        .axis-label {
+            font-weight: 600; color: #343a40; font-size: 0.9em; position: absolute;
+            top: -18px; left: 0; width: 100%; text-align: center; white-space: nowrap;
+        }
+        .y-axis .tick { position: absolute; transform: translateY(50%); white-space: nowrap; }
+        .y-axis .tick-mark { position: absolute; height: 2px; background-color: #aab5c0; width: 8px; transform: translateY(-50%); }
+        .y-axis.left .tick-mark { right: -4px; }
+        .y-axis.right .tick-mark { left: -4px; }
+        
+        .chart-area { flex-grow: 1; background: linear-gradient(to top, #e3f2fd 0%, #ffffff 100%); position: relative; border: 2px solid #495057; border-radius: 8px; overflow: hidden; }
+        .grid-line { position: absolute; width: 100%; left: 0; border-top: 1px dashed #cdd4da; z-index: 0; }
+        .level-line { position: absolute; width: 100%; left: 0; border-top-style: solid; display: flex; align-items: center; z-index: 2; padding: 0 10px; }
+        .level-label { background: rgba(255, 255, 255, 0.95); padding: 4px 10px; font-size: 0.85em; border-radius: 6px; font-weight: 600; box-shadow: 0 2px 6px rgba(0, 0, 0, 0.15); border: 2px solid; position: absolute; left: 10px; transform: translateY(-50%); white-space: nowrap; }
+        .level-label.center-top { left: 50%; transform: translate(-50%, -50%); margin-top: 0; }
+        #line-location { border-top: 3px solid #28a745; }
+        #line-location .level-label { border-color: #28a745; background-color: #d4edda; color: #155724; right: 10px; left: auto; }
+        #line-keikaku { border-top: 4px dashed #696969; }
+        #line-keikaku .level-label { border-color: #696969; color: #000000; background-color: #a9a9a9; }
+        #line-hinan { border-top: 3px solid #800080; }
+        #line-hinan .level-label { border-color: #800080; color: #fff; background-color: #800080; }
+        #line-handan { border-top: 3px solid #dc3545; }
+        #line-handan .level-label { border-color: #dc3545; color: #fff; background-color: #dc3545; }
+        #line-chuui { border-top: 3px solid #ffc107; }
+        #line-chuui .level-label { border-color: #ffc107; color: #343a40; background-color: #fff3cd; }
+        #line-taiki { border-top: 3px solid #0000cd; }
+        #line-taiki .level-label { border-color: #0000cd; color: #000000; background-color: #87cefa; }
+        #line-evacuation-prepare, #line-evacuation-start { border-top: 4px solid black; }
+        #line-evacuation-prepare .level-label, #line-evacuation-start .level-label { border-color: black; background-color: #ffff00; color: black; }
+        
+        .current-water-level { position: absolute; width: 100%; left: 0; bottom: 0; background: linear-gradient(to top, rgba(0, 123, 255, 0.7), rgba(0, 123, 255, 0.3)); transition: height 0.5s ease; display: flex; justify-content: center; align-items: flex-end; z-index: 1; }
+        .current-water-label { padding: 6px 12px; font-weight: 700; color: white; text-shadow: 1px 1px 3px rgba(0, 0, 0, 0.5); font-size: 1em; margin-bottom: 8px; background: rgba(0, 0, 0, 0.2); border-radius: 6px; }
+        .extracted { background-color: #d4edda !important; border-color: #28a745 !important; }
+        
+        .two-column-form { display: grid; grid-template-columns: 1fr 1fr; gap: 15px; }
+        .column-left-form, .column-right-form { display: flex; flex-direction: column; gap: 1px; }
+        .column-right-form h3 { font-size: 1.1em; color: #495057; margin-top: 4px; margin-bottom: 1px; }
+        .datum-selection { background-color: #e9ecef; padding: 8px; border-radius: 8px; margin-bottom: 10px; }
+        .datum-selection .form-group { margin-bottom: 0; }
+
+        .main-layout-grid {
+            display: grid;
+            /* Default values, will be overridden by JS if saved state exists */
+            grid-template-columns: 1.5fr 5px 3fr 5px 1fr;
+            height: 100%;
+        }
+        .main-layout-grid.history-collapsed {
+            grid-template-columns: 1fr 5px 1fr 0px 45px !important; /* Use important to override inline style from JS */
+        }
+        .resizer-vertical {
+            background-color: #e9ecef;
+            cursor: col-resize;
+            transition: background-color 0.2s;
+        }
+        .resizer-vertical:hover { background-color: #ced4da; }
+        
+        .history-panel.collapsed .history-section > *:not(.history-panel-header),
+        .history-panel.collapsed #map-container { display: none; }
+        .history-panel.collapsed .history-panel-header .header-top-row,
+        .history-panel.collapsed .history-panel-header .button-group { display: none; }
+        .history-panel.collapsed { padding-top: 0; padding-bottom: 0; }
+        .history-panel-header { position: relative; }
+        #toggle-history-panel {
+            position: absolute; top: 8px; z-index: 10;
+            width: 30px; height: 30px; border-radius: 50%;
+            border: 1px solid #ccc; background: white; cursor: pointer;
+            display: flex; align-items: center; justify-content: center;
+            font-size: 1.2em; box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+            right: -5px;
+        }
+        .history-collapsed #toggle-history-panel { right: auto; left: 50%; transform: translateX(-50%); }
+
+        .layout-column-center {
+            display: grid;
+            /* Default values, will be overridden by JS if saved state exists */
+            grid-template-columns: 1fr 5px 1fr;
+            height: 100%;
+            overflow: hidden;
+            min-width: 0;
+        }
+        .layout-column-center > .section { display: flex; flex-direction: column; min-height: 0; min-width: 0; }
+        .results-column { display: flex; flex-direction: column; gap: 5px; max-height: 100%; min-width: 0; }
+        .results-column > .section:last-of-type { display: flex; flex-direction: column; flex: 1; min-height: 0; }
+        .section-b-container { display: flex; flex-direction: column; flex: 1; min-height: 0; }
+        .form-scroll-wrapper { flex: 1; overflow-y: auto; padding: 5px 10px 5px 5px; margin: 0 -5px; }
+        .button-wrapper { margin-top: auto; padding-top: 5px; }
+        
+        .modal-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.6); z-index: 100; display: none; justify-content: center; align-items: center; }
+        .modal-content { background: white; padding: 25px; border-radius: 12px; box-shadow: 0 10px 30px rgba(0,0,0,0.3); width: 90%; max-width: 500px; }
+        .modal-content h2 { margin-bottom: 15px; }
+        .modal-actions { margin-top: 20px; display: flex; gap: 10px; justify-content: flex-end; }
+        .modal-actions .btn { width: auto; }
+
+        .history-panel { display: grid; grid-template-rows: 4fr 6fr; gap: 10px; overflow: hidden; min-width: 0; }
+        .history-section { display: flex; flex-direction: column; min-height: 0; }
+        .history-panel-header { display: flex; flex-direction: column; gap: 8px; flex-shrink: 0; }
+        .history-panel-header .header-top-row { display: flex; justify-content: space-between; align-items: center; gap: 10px; }
+        .history-panel-header .header-top-row h2 { margin-bottom: 0; flex-shrink: 0; }
+        .history-panel-header .header-top-row .btn { white-space: nowrap; margin-top: 0; flex-shrink: 1; }
+        .history-panel-header .button-group { margin-top: 0; }
+        .history-tree-wrapper { flex-grow: 1; overflow-y: auto; min-height: 150px; padding: 10px 5px; margin: 10px -5px 0; border-top: 1px solid #e9ecef; }
+        .history-tree ul { list-style: none; padding-left: 15px; }
+        .history-tree summary { cursor: pointer; padding: 2px 4px; border-radius: 4px; font-weight: 600; font-size: 0.9em; }
+        .history-tree summary:hover { background-color: #e9ecef; }
+        .history-tree .tree-item { display: flex; justify-content: space-between; align-items: center; padding: 3px 5px; cursor: pointer; border-radius: 4px; margin-left: -15px; padding-left: 15px; font-size: 0.85em; }
+        .history-tree li.tree-item:nth-child(even) { background-color: #f8f9fa; }
+        .history-tree .tree-item:hover { background-color: #e0e9f5; }
+        .history-tree .tree-item.active { background-color: #cddcfa; font-weight: bold; }
+        .history-tree .delete-btn { background: none; border: none; color: #dc3545; cursor: pointer; font-size: 1.2em; opacity: 0.5; padding: 0 5px; }
+        .history-tree .delete-btn:hover { opacity: 1; }
+
+        #map-container { display: flex; flex-direction: column; min-height: 0; }
+        .map-header { display: flex; justify-content: space-between; align-items: baseline; flex-wrap: wrap; gap: 10px; flex-shrink: 0; margin-bottom: 5px; }
+        #map-coordinates { font-size: 0.9em; color: #495057; font-family: monospace; white-space: nowrap; }
+        #weather-display { font-size: 1.1em; font-weight: 600; padding: 3px 8px; background-color: rgba(255,255,255,0.7); border-radius: 8px; border: 1px solid #dee2e6; }
+        #map { width: 100%; flex-grow: 1; border-radius: 8px; border: 1px solid #e9ecef; z-index: 0; }
+
+        .form-scroll-wrapper input[type="text"], .form-scroll-wrapper input[type="number"], .form-scroll-wrapper select { padding-top: 5px; padding-bottom: 5px; }
+        .form-scroll-wrapper label { margin-bottom: 0px; }
+        .form-row { display: flex; gap: 15px; }
+        .form-row .form-group { flex: 1; }
+        .section-a-layout { display: flex; flex-direction: column; flex-grow: 1; min-height: 0; }
+        .section-a-textarea-group { flex-grow: 1; display: flex; flex-direction: column; margin-bottom: 10px; }
+        .section-a-textarea-group .form-group { flex-grow: 1; margin-bottom: 0; }
+        .section-a-textarea-group textarea { height: 100%; }
+        .section-a-button-group { display: flex; gap: 10px; }
+        .section-a-button-group .btn { margin-top: 0 !important; white-space: nowrap; font-size: 0.9em; padding-left: 15px; padding-right: 15px; }
+        
+        .onboarding-modal-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.7); z-index: 1000; display: none; justify-content: center; align-items: center; padding: 20px; }
+        .onboarding-container { background: white; border-radius: 20px; box-shadow: 0 20px 60px rgba(0,0,0,0.3); max-width: 800px; width: 100%; overflow: hidden; display: flex; flex-direction: column; max-height: 90vh; }
+        .progress-bar { height: 4px; background: #e0e0e0; position: relative; }
+        .progress-fill { height: 100%; background: linear-gradient(90deg, #667eea, #764ba2); transition: width 0.3s ease; }
+        .onboarding-content-wrapper { overflow-y: auto; }
+        .step-content { padding: 40px; display: none; }
+        .step-content.active { display: block; animation: fadeIn 0.5s; }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(20px); } to { opacity: 1; transform: translateY(0); } }
+        .step-title { font-size: 2em; color: #667eea; margin-bottom: 20px; font-weight: 700; }
+        .step-description { font-size: 1.1em; line-height: 1.8; color: #555; margin-bottom: 30px; }
+        .example-box { background: #f8f9fa; border-left: 4px solid #667eea; padding: 20px; border-radius: 8px; margin: 20px 0; }
+        .example-title { font-weight: 600; color: #667eea; margin-bottom: 10px; }
+        .onboarding-container .button-group { display: flex; gap: 15px; margin-top: 40px; }
+        .onboarding-container .btn { padding: 12px 30px; border: none; border-radius: 8px; font-size: 1em; font-weight: 600; cursor: pointer; transition: all 0.2s; flex: 1; margin-top: 0; }
+        .onboarding-container .btn-primary { background: linear-gradient(135deg, #667eea, #764ba2); color: white; }
+        .onboarding-container .btn-primary:hover { transform: translateY(-2px); box-shadow: 0 8px 20px rgba(102,126,234,0.4); }
+        .onboarding-container .btn-secondary { background: white; color: #667eea; border: 2px solid #667eea; }
+        .onboarding-container .btn-secondary:hover { background: #f8f9fa; }
+        .feature-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 20px; margin: 30px 0; }
+        .feature-card { background: #f8f9fa; padding: 20px; border-radius: 12px; text-align: center; }
+        .feature-icon { font-size: 3em; margin-bottom: 10px; }
+        .feature-name { font-weight: 600; color: #333; margin-bottom: 8px; }
+        .feature-desc { font-size: 0.9em; color: #666; }
+        .warning-box { background: #fff3cd; border-left: 4px solid #ffc107; padding: 15px; border-radius: 8px; margin: 20px 0; }
+        .warning-box strong { color: #856404; }
+        .step-indicator { text-align: center; color: #999; font-size: 0.9em; margin-top: 20px; }
+        
+        @media (max-width: 1600px) {
+            html, body { height: auto; overflow: auto; }
+            .container { height: auto; }
+            .main-layout-grid, .layout-column-center {
+                grid-template-columns: 1fr;
+                height: auto;
+            }
+            .resizer-vertical { display: none; }
+            .main-layout-grid.history-collapsed { grid-template-columns: 1fr; }
+            .history-panel { display: none; }
+            .layout-column-center { display: contents; } 
+            .results-column > .section:last-of-type { min-height: 500px; }
+        }
+        @media (max-width: 768px) {
+            .header { flex-direction: column; text-align: center; gap: 10px; padding: 10px; }
+            .header-content h1 { font-size: 1.5em; }
+            .graph-container { flex-direction: column; align-items: stretch; }
+            .y-axis { width: 100%; height: auto; flex-direction: row; padding: 10px 0; }
+            .axis-label { writing-mode: horizontal-tb; transform: none; position: static; text-align: center; width: 100%;}
+        }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <div class="header">
+        <div class="header-content">
+            <h1>💧水位・標高 変換ツール🌊</h1>
+            <p>河川観測所や現地の情報を入力し、水位と標高の関係を視覚的に表示します</p>
+        </div>
+        <div class="header-actions">
+            <button id="sample-data-button" class="btn-header">サンプルデータで試す</button>
+            <button id="show-help-button" class="btn-header">？ ヘルプ</button>
+        </div>
+    </div>
+
+    <div class="content">
+        <div class="main-layout-grid" id="main-layout">
+            
+            <div class="layout-column-center" id="col-ab-container">
+                <div class="section" id="col-a">
+                    <h2>📋 A. 諸元表から抽出</h2>
+                    <div class="form-group" style="background-color: #e9ecef; padding: 8px; border-radius: 8px; margin-bottom: 10px;">
+                        <label for="input-datum-select">
+                            <strong>貼り付ける<u>零点高</u>の基準面を選択</strong>
+                        </label>
+                        <select id="input-datum-select">
+                            <option value="" selected disabled>-- 選択してください --</option>
+                            <option value="TP" data-name="T.P." data-offset="0">T.P. (東京湾中等潮位)</option>
+                            <option value="KP" data-name="K.P." data-offset="-0.8745">K.P. (北上川) [T.P. -0.8745m]</option>
+                            <option value="SP" data-name="S.P." data-offset="-0.0873">S.P. (鳴瀬川) [T.P. -0.0873m]</option>
+                            <option value="YP" data-name="Y.P." data-offset="-0.8402">Y.P. (利根川) [T.P. -0.8402m]</option>
+                            <option value="AP_ARAKAWA" data-name="A.P." data-offset="-1.1344">A.P. (荒川・中川・多摩川) [T.P. -1.1344m]</option>
+                            <option value="OP" data-name="O.P." data-offset="-1.3000">O.P. (淀川) [T.P. -1.3000m]</option>
+                            <option value="AP_YOSHINO" data-name="A.P." data-offset="-0.8333">A.P. (吉野川) [T.P. -0.8333m]</option>
+                            <option value="TPW" data-name="T.P.W." data-offset="0.113">T.P.W. (渡川) [T.P. +0.113m]</option>
+                            <option value="BSL" data-name="B.S.L." data-offset="84.371">B.S.L. (琵琶湖) [T.P. +84.371m]</option>
+                        </select>
+                    </div>
+
+                    <div class="section-a-layout">
+                        <div class="section-a-textarea-group">
+                            <p class="section-description">観測所の諸元表テキストをここに貼り付け</p>
+                            <div class="form-group">
+                                <textarea id="spec-text" placeholder="観測所名	岩淵水門（上）（いわぶちすいもん（かみ））&#10;..."></textarea>
+                            </div>
+                        </div>
+                        <div class="section-a-button-group">
+                            <a href="https://www.river.go.jp/index" target="_blank" class="btn btn-info">川の防災情報</a>
+                            <button id="extract-button" class="btn btn-primary" style="background: #28a745;">諸元表から抽出</button>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="resizer-vertical" id="resizer-ab"></div>
+
+                <div class="section section-b-container" id="col-b">
+                    <h2>✏️ B. 観測所の情報を入力</h2>
+                    <p class="section-description">A欄で抽出後、内容を確認してください。</p>
+
+                    <div class="form-scroll-wrapper">
+                        <div class="datum-selection">
+                            <div class="form-group">
+                                <label for="datum-select">
+                                    <strong>表示に使用する基準面を選択</strong>
+                                </label>
+                                <select id="datum-select">
+                                    <option value="TP" data-name="T.P." data-offset="0">東京湾中等潮位 (T.P.)</option>
+                                    <option value="KP" data-name="K.P." data-offset="-0.8745">北上川 (K.P.) [T.P. -0.8745m]</option>
+                                    <option value="SP" data-name="S.P." data-offset="-0.0873">鳴瀬川 (S.P.) [T.P. -0.0873m]</option>
+                                    <option value="YP" data-name="Y.P." data-offset="-0.8402">利根川 (Y.P.) [T.P. -0.8402m]</option>
+                                    <option value="AP_ARAKAWA" data-name="A.P." data-offset="-1.1344">荒川・中川・多摩川 (A.P.) [T.P. -1.1344m]</option>
+                                    <option value="OP" data-name="O.P." data-offset="-1.3000">淀川 (O.P.) [T.P. -1.3000m]</option>
+                                    <option value="AP_YOSHINO" data-name="A.P." data-offset="-0.8333">吉野川 (A.P.) [T.P. -0.8333m]</option>
+                                    <option value="TPW" data-name="T.P.W." data-offset="0.113">渡川 (T.P.W.) [T.P. +0.113m]</option>
+                                    <option value="BSL" data-name="B.S.L." data-offset="84.371">琵琶湖 (B.S.L.) [T.P. +84.371m]</option>
+                                </select>
+                            </div>
+                        </div>
+
+                        <div class="two-column-form">
+                            <div class="column-left-form">
+                                <div class="form-group"><label for="station-name">観測所名</label><input type="text" id="station-name" placeholder="例: 岩淵水門(上)"></div>
+                                <div class="form-group">
+                                    <label for="zero-point">水位標のゼロ点高<span class="required-mark">*</span></label>
+                                    <input type="number" id="zero-point" step="0.01" placeholder="例: 0.00">
+                                </div>
+                                <div class="form-group">
+                                    <label for="keikaku-level">計画高水位 (m)</label>
+                                    <input type="number" id="keikaku-level" step="0.01">
+                                </div>
+                                <div class="form-group"><label for="hinan-level">氾濫危険水位 (m)</label><input type="number" id="hinan-level" step="0.01"></div>
+                                <div class="form-group"><label for="handan-level">避難判断水位 (m)</label><input type="number" id="handan-level" step="0.01"></div>
+                                <div class="form-group"><label for="chuui-level">氾濫注意水位 (m)</label><input type="number" id="chuui-level" step="0.01"></div>
+                                <div class="form-group"><label for="taiki-level">水防団待機水位 (m)</label><input type="number" id="taiki-level" step="0.01"></div>
+                            </div>
+                            <div class="column-right-form">
+                                <div class="form-group"><label for="observation-datetime">水位観測日時</label><input type="text" id="observation-datetime" placeholder="例: 2025/11/08 10:00"></div>
+                                <div class="form-group"><label for="current-level">水位 (m)</label><input type="number" id="current-level" step="0.01" placeholder="例: 1.97"></div>
+                                <div class="form-group">
+                                    <label for="location-elevation">現在地の標高 (T.P. m)</label>
+                                    <input type="number" id="location-elevation" step="0.01" placeholder="例: 8.50">
+                                </div>
+                                <h3>⚠️ 避難行動基準</h3>
+                                <div class="form-group">
+                                    <label for="evacuation-prepare-offset">避難準備開始 (m下)</label>
+                                    <input type="number"id="evacuation-prepare-offset" step="0.1" placeholder="例: 2.0">
+                                </div>
+                                <div class="form-group"><label for="evacuation-start-offset">避難開始 (m下)</label><input type="number" id="evacuation-start-offset" step="0.1" placeholder="例: 1.5"></div>
+                                <h3>グラフ表示範囲</h3>
+                                <div class="form-row">
+                                    <div class="form-group" id="max-level-group"><label for="max-level">最大水位 (m)</label><input type="number" id="max-level" step="1" placeholder="自動調整"></div>
+                                    <div class="form-group" id="min-level-group"><label for="min-level">最小水位 (m)</label><input type="number" id="min-level" step="1" placeholder="自動調整"></div>
+                                </div>
+                                <input type="hidden" id="latitude">
+                                <input type="hidden" id="longitude">
+                            </div>
+                        </div>
+                    </div>
+                    <div class="button-wrapper">
+                        <button id="calculate-button" class="btn btn-primary">📊 計算・グラフ表示</button>
+                    </div>
+                </div>
+            </div>
+
+            <div class="resizer-vertical" id="resizer-bc"></div>
+
+            <div class="results-column" id="col-c">
+                <div class="section">
+                    <h2 id="result-title">📈 C. 変換結果</h2>
+                    <table id="result-table">
+                        <thead><tr><th>水位の名称</th><th>水位 (m)</th><th>標高 (T.P. m)</th></tr></thead>
+                        <tbody id="result-table-body"></tbody>
+                    </table>
+                </div>
+                <div class="section">
+                    <h2>📉 D. 水位と標高のグラフ</h2>
+                    <div class="graph-container">
+                        <div class="y-axis left" id="level-axis">
+                            <div class="axis-label">水位 (m)</div>
+                        </div>
+                        <div class="chart-area" id="chart-area"></div>
+                        <div class="y-axis right" id="elevation-axis">
+                            <div class="axis-label" id="elevation-axis-label">標高 (T.P. m)</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="resizer-vertical" id="resizer-ch"></div>
+
+            <div class="history-panel section" id="col-h">
+                 <div class="history-section">
+                    <div class="history-panel-header">
+                        <button id="toggle-history-panel" title="パネルを折りたたむ">»</button>
+                         <div class="header-top-row">
+                            <h2>📁 保存履歴</h2>
+                            <button id="show-save-modal-button" class="btn btn-primary">現在の設定を新規保存</button>
+                         </div>
+                         <div class="button-group">
+                            <button id="import-button" class="btn btn-info">インポート</button>
+                            <button id="export-button" class="btn btn-secondary">エクスポート</button>
+                         </div>
+                         <input type="file" id="import-file-input" style="display: none;" accept=".json">
+                    </div>
+                    <div class="history-tree-wrapper">
+                        <div id="history-tree"></div>
+                    </div>
+                </div>
+                
+                <div id="map-container">
+                    <div class="map-header">
+                        <h2>📍 観測所位置</h2>
+                        <span id="weather-display"></span>
+                        <span id="map-coordinates"></span>
+                    </div>
+                    <div id="map"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div id="save-modal" class="modal-overlay">
+    <div class="modal-content">
+        <h2>履歴に新規保存</h2>
+        <div class="form-group"><label for="save-suikei">水系名<span class="required-mark">*</span></label><input type="text" id="save-suikei" placeholder="例: 荒川水系"></div>
+        <div class="form-group"><label for="save-kasen">河川名<span class="required-mark">*</span></label><input type="text" id="save-kasen" placeholder="例: 荒川"></div>
+        <div class="form-group"><label for="save-station">観測所名（フォームから自動入力）</label><input type="text" id="save-station" disabled></div>
+        <div class="form-group"><label for="save-location-name">地点の名称 (任意)</label><input type="text" id="save-location-name" placeholder="例: 自宅, 勤務先など"></div>
+        <div class="modal-actions">
+            <button id="cancel-save-button" class="btn btn-secondary">キャンセル</button>
+            <button id="confirm-save-button" class="btn btn-primary">この内容で保存</button>
+        </div>
+    </div>
+</div>
+
+<div id="onboarding-modal" class="onboarding-modal-overlay">
+    <div class="onboarding-container">
+        <div class="progress-bar">
+            <div class="progress-fill" id="progress"></div>
+        </div>
+        <div class="onboarding-content-wrapper">
+            <div class="step-content active" data-step="1">
+                <div class="step-title">🌊 水位・標高変換ツールへようこそ</div>
+                <div class="step-description">このツールは、河川の観測所情報から水位と標高の関係を計算し、避難判断に役立つ視覚的な情報を提供します。</div>
+                <div class="feature-grid">
+                    <div class="feature-card"><div class="feature-icon">📋</div><div class="feature-name">簡単データ抽出</div><div class="feature-desc">諸元表をコピペするだけ</div></div>
+                    <div class="feature-card"><div class="feature-icon">📊</div><div class="feature-name">視覚的なグラフ</div><div class="feature-desc">水位と標高の関係を一目で把握</div></div>
+                    <div class="feature-card"><div class="feature-icon">⚠️</div><div class="feature-name">避難基準表示</div><div class="feature-desc">現在地との関係を明確化</div></div>
+                    <div class="feature-card"><div class="feature-icon">💾</div><div class="feature-name">履歴管理</div><div class="feature-desc">複数地点を保存・比較</div></div>
+                </div>
+                <div class="button-group">
+                    <button class="btn btn-secondary" onclick="onboarding.skip()">スキップ</button>
+                    <button class="btn btn-primary" onclick="onboarding.nextStep()">次へ</button>
+                </div>
+                <div class="step-indicator">ステップ 1 / 4</div>
+            </div>
+            
+            <div class="step-content" data-step="2">
+                <div class="step-title">📋 ステップ1: 諸元表から抽出</div>
+                <div class="step-description">国土交通省の「川の防災情報サイト」から観測所の諸元表をコピーして貼り付けます。</div>
+                <div class="example-box">
+                    <div class="example-title">💡 手順</div>
+                    <ol style="padding-left: 20px; line-height: 2;">
+                        <li><strong>基準面を選択</strong>: 諸元表に記載されている零点高の基準面（T.P., K.P.など）を選びます</li>
+                        <li><strong>諸元表をコピペ</strong>: テキストエリアに貼り付けます</li>
+                        <li><strong>「諸元表から抽出」ボタンをクリック</strong></li>
+                    </ol>
+                </div>
+                <div class="warning-box"><strong>⚠️ 重要:</strong> 基準面の選択を間違えると、計算結果が大きくずれます。必ず諸元表に記載されている基準面を選択してください。</div>
+                <div class="button-group">
+                    <button class="btn btn-secondary" onclick="onboarding.prevStep()">戻る</button>
+                    <button class="btn btn-primary" onclick="onboarding.nextStep()">次へ</button>
+                </div>
+                <div class="step-indicator">ステップ 2 / 4</div>
+            </div>
+            
+            <div class="step-content" data-step="3">
+                <div class="step-title">✏️ ステップ2: 情報を確認・入力</div>
+                <div class="step-description">抽出された情報を確認し、必要に応じて追加情報を入力します。</div>
+                <div class="example-box">
+                    <div class="example-title">💡 入力項目</div>
+                    <ul style="padding-left: 20px; line-height: 2;">
+                        <li><strong>必須:</strong> 水位標のゼロ点高（自動抽出されます）</li>
+                        <li><strong>推奨:</strong> 各種水位（計画高水位、氾濫危険水位など）</li>
+                        <li><strong>オプション:</strong> 現在地の標高、避難行動基準</li>
+                    </ul>
+                </div>
+                <div class="example-box">
+                    <div class="example-title">🎯 表示用基準面の選択</div>
+                    グラフや表の計算値に使用する基準面を選べます。通常はT.P.（東京湾中等潮位）を推奨しますが、地域によって使い慣れた基準面を選択できます。
+                </div>
+                <div class="button-group">
+                    <button class="btn btn-secondary" onclick="onboarding.prevStep()">戻る</button>
+                    <button class="btn btn-primary" onclick="onboarding.nextStep()">次へ</button>
+                </div>
+                <div class="step-indicator">ステップ 3 / 4</div>
+            </div>
+            
+            <div class="step-content" data-step="4">
+                <div class="step-title">📊 ステップ3: 結果の確認と保存</div>
+                <div class="step-description">「計算・グラフ表示」ボタンをクリックすると、結果が表示されます。</div>
+                <div class="example-box">
+                    <div class="example-title">📈 表示される情報</div>
+                    <ul style="padding-left: 20px; line-height: 2;">
+                        <li><strong>変換結果表:</strong> 各水位の標高値</li>
+                        <li><strong>グラフ:</strong> 水位と標高の関係を視覚化</li>
+                        <li><strong>地図:</strong> 観測所の位置と天気情報</li>
+                    </ul>
+                </div>
+                <div class="example-box">
+                    <div class="example-title">💾 履歴への保存</div>
+                    「現在の設定を新規保存」ボタンから、水系名・河川名・地点名を入力して保存できます。複数地点を保存して比較することも可能です。
+                </div>
+                <div class="warning-box"><strong>⚠️ 注意:</strong> 履歴はブラウザに保存されます。定期的に「エクスポート」機能でバックアップを取ることをおすすめします。</div>
+                <div class="button-group">
+                    <button class="btn btn-secondary" onclick="onboarding.prevStep()">戻る</button>
+                    <button class="btn btn-primary" onclick="onboarding.start()">使ってみる</button>
+                </div>
+                <div class="step-indicator">ステップ 4 / 4</div>
+            </div>
+        </div>
+    </div>
+</div>
+
+
+<script>
+    // ▼▼▼ ADDED: Column Width Persistence Logic ▼▼▼
+    function loadColumnWidths() {
+        const resizer = document.getElementById('resizer-bc');
+        if (!resizer || resizer.offsetParent === null) {
+            return; // Don't load widths on mobile/responsive view
+        }
+
+        const mainLayoutColumns = localStorage.getItem('mainLayoutColumns');
+        if (mainLayoutColumns) {
+            document.getElementById('main-layout').style.gridTemplateColumns = mainLayoutColumns;
+        }
+
+        const abLayoutColumns = localStorage.getItem('abLayoutColumns');
+        if (abLayoutColumns) {
+            document.getElementById('col-ab-container').style.gridTemplateColumns = abLayoutColumns;
+        }
+    }
+
+    function initializeResizers() {
+        const createResizableColumn = (resizer, leftEl, rightEl, minLeft, minRight, storageKey) => {
+            let x = 0;
+            let leftWidth = 0;
+
+            const mouseDownHandler = (e) => {
+                e.preventDefault();
+                x = e.clientX;
+                leftWidth = leftEl.getBoundingClientRect().width;
+
+                document.addEventListener('mousemove', mouseMoveHandler);
+                document.addEventListener('mouseup', mouseUpHandler);
+                document.body.style.cursor = 'col-resize';
+                document.body.style.userSelect = 'none';
+            };
+
+            const mouseMoveHandler = (e) => {
+                const dx = e.clientX - x;
+                const newLeftWidth = leftWidth + dx;
+                
+                const parentGrid = leftEl.parentElement;
+                const rightWidth = rightEl.getBoundingClientRect().width;
+                const newRightWidth = rightWidth - dx;
+
+                if (newLeftWidth < minLeft || newRightWidth < minRight) {
+                    return;
+                }
+
+                const allColumns = Array.from(parentGrid.children);
+                const gridTemplateColumns = getComputedStyle(parentGrid).gridTemplateColumns.split(' ');
+                
+                const leftIndex = allColumns.indexOf(leftEl);
+                const rightIndex = allColumns.indexOf(rightEl);
+
+                gridTemplateColumns[leftIndex] = `${newLeftWidth}px`;
+                gridTemplateColumns[rightIndex] = '1fr'; 
+                
+                parentGrid.style.gridTemplateColumns = gridTemplateColumns.join(' ');
+            };
+
+            const mouseUpHandler = () => {
+                document.removeEventListener('mousemove', mouseMoveHandler);
+                document.removeEventListener('mouseup', mouseUpHandler);
+                document.body.style.cursor = 'default';
+                document.body.style.userSelect = 'auto';
+
+                // Save the new layout to localStorage
+                if (storageKey) {
+                    const parentGrid = leftEl.parentElement;
+                    localStorage.setItem(storageKey, parentGrid.style.gridTemplateColumns);
+                }
+
+                if (window.map) {
+                    setTimeout(() => window.map.invalidateSize(), 50);
+                }
+            };
+
+            resizer.addEventListener('mousedown', mouseDownHandler);
+        };
+
+        const resizerAB = document.getElementById('resizer-ab');
+        const resizerBC = document.getElementById('resizer-bc');
+        const resizerCH = document.getElementById('resizer-ch');
+
+        const colA = document.getElementById('col-a');
+        const colB = document.getElementById('col-b');
+        const colABContainer = document.getElementById('col-ab-container');
+        const colC = document.getElementById('col-c');
+        const colH = document.getElementById('col-h');
+
+        createResizableColumn(resizerAB, colA, colB, 250, 250, 'abLayoutColumns');
+        createResizableColumn(resizerBC, colABContainer, colC, 540, 400, 'mainLayoutColumns');
+        // Both BC and CH resizers affect the main layout, so they save to the same key.
+        createResizableColumn(resizerCH, colC, colH, 400, 300, 'mainLayoutColumns');
+    }
+    // ▲▲▲ ADDED ▲▲▲
+
+    const savableFieldIds = [
+        'spec-text', 'datum-select', 'station-name', 'zero-point',
+        'keikaku-level', 'hinan-level', 'handan-level', 'chuui-level', 'taiki-level',
+        'observation-datetime', 'current-level', 'location-elevation',
+        'evacuation-prepare-offset', 'evacuation-start-offset',
+        'max-level', 'min-level', 'input-datum-select',
+        'latitude', 'longitude'
+    ];
+    const historyStorageKey = 'waterLevelConverterHistory';
+    const onboardingStorageKey = 'onboardingCompleted';
+    let historyData = [];
+    let activeHistoryId = null;
+    let map;
+    let marker;
+
+    const saveModal = document.getElementById('save-modal');
+    const historyTreeContainer = document.getElementById('history-tree');
+
+    const onboarding = {
+        modal: document.getElementById('onboarding-modal'),
+        currentStep: 1,
+        totalSteps: 4,
+        
+        show: function() { this.showStep(1); this.modal.style.display = 'flex'; },
+        hide: function() { this.modal.style.display = 'none'; },
+        updateProgress: function() {
+            const progress = (this.currentStep / this.totalSteps) * 100;
+            document.getElementById('progress').style.width = progress + '%';
+        },
+        showStep: function(step) {
+            document.querySelectorAll('.step-content').forEach(el => el.classList.remove('active'));
+            const stepContent = document.querySelector(`.step-content[data-step="${step}"]`);
+            if (stepContent) {
+                stepContent.classList.add('active'); this.currentStep = step; this.updateProgress();
+            }
+        },
+        nextStep: function() { if (this.currentStep < this.totalSteps) this.showStep(this.currentStep + 1); },
+        prevStep: function() { if (this.currentStep > 1) this.showStep(this.currentStep - 1); },
+        skip: function() { if (confirm('チュートリアルをスキップしますか？\nヘッダーの「？ ヘルプ」からいつでも再表示できます。')) this.start(); },
+        start: function() { this.hide(); localStorage.setItem(onboardingStorageKey, 'true'); }
+    };
+
+    function initMap() {
+        const gsiStd = L.tileLayer('https://cyberjapandata.gsi.go.jp/xyz/std/{z}/{x}/{y}.png', { attribution: "<a href='https://maps.gsi.go.jp/development/ichiran.html' target='_blank'>国土地理院</a>" });
+        const gsiPhoto = L.tileLayer('https://cyberjapandata.gsi.go.jp/xyz/ort/{z}/{x}/{y}.jpg', { attribution: "<a href='https://maps.gsi.go.jp/development/ichiran.html' target='_blank'>国土地理院</a>" });
+        const osm = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors' });
+        map = L.map('map', { center: [36, 138], zoom: 5, layers: [gsiStd] });
+        const baseLayers = { "地理院地図": gsiStd, "地理院地図(写真)": gsiPhoto, "OpenStreetMap": osm };
+        L.control.layers(baseLayers).addTo(map);
+    }
+    
+    async function fetchWeather(lat, lon) {
+        const apiKey = 'APIキー';
+        const weatherDisplay = document.getElementById('weather-display');
+        weatherDisplay.innerHTML = ''; 
+        if (apiKey === 'APIキー') { console.warn('天気情報を表示するには、OpenWeatherMapのAPIキーを設定してください。'); return; }
+        const url = `https://api.openweathermap.org/data/2.5/weather?lat=${lat}&lon=${lon}&appid=${apiKey}&units=metric&lang=ja`;
+        try {
+            const response = await fetch(url);
+            if (!response.ok) throw new Error(`APIエラー: ${response.status}`);
+            const data = await response.json();
+            const icon = mapWeatherToIcon(data.weather[0].main);
+            const temp = Math.round(data.main.temp);
+            weatherDisplay.innerHTML = `${icon} ${temp}℃`;
+        } catch (error) { console.error('天気情報の取得に失敗しました:', error); weatherDisplay.innerHTML = '天気取得失敗'; }
+    }
+    
+    function mapWeatherToIcon(weatherMain) {
+        switch (weatherMain) {
+            case 'Clear': return '☀️'; case 'Clouds': return '☁️'; case 'Rain': return '🌧️';
+            case 'Drizzle': return '🌦️'; case 'Thunderstorm': return '⛈️'; case 'Snow': return '❄️';
+            case 'Mist': case 'Smoke': case 'Haze': case 'Dust': case 'Fog': case 'Sand': case 'Ash': case 'Squall': case 'Tornado': return '🌫️';
+            default: return '❔';
+        }
+    }
+
+    function updateMap(lat, lon, name) {
+        const coordDisplay = document.getElementById('map-coordinates');
+        if (marker) { map.removeLayer(marker); marker = null; }
+        coordDisplay.textContent = ''; document.getElementById('weather-display').innerHTML = '';
+        const latitude = parseFloat(lat); const longitude = parseFloat(lon); const stationName = name || '観測所';
+        if (!isNaN(latitude) && !isNaN(longitude) && map) {
+            coordDisplay.textContent = `緯度: ${latitude.toFixed(6)}, 経度: ${longitude.toFixed(6)}`;
+            marker = L.marker([latitude, longitude]).addTo(map).bindPopup(`<b>${stationName}</b>`).openPopup();
+            map.setView([latitude, longitude], 14);
+            fetchWeather(latitude, longitude);
+            setTimeout(() => map.invalidateSize(), 200);
+        }
+    }
+    
+    function convertDMSToDD(dms) {
+        if (!dms || typeof dms !== 'string') return null;
+        const pattern = /(\d{1,3})[\s°度、-]\s*(\d{1,2})[\s'′分、-]\s*(\d{1,2}(?:\.\d+)?)[\s"″秒]?/;
+        const match = dms.match(pattern);
+        if (match) {
+            const degrees = parseFloat(match[1]), minutes = parseFloat(match[2]), seconds = parseFloat(match[3]);
+            if (!isNaN(degrees) && !isNaN(minutes) && !isNaN(seconds)) return degrees + (minutes / 60) + (seconds / 3600);
+        }
+        return null;
+    }
+
+    function calculateNiceTickStep(range, maxTicks = 10) {
+        if (range <= 0) return 1;
+        const rawStep = range / maxTicks;
+        const magnitude = Math.pow(10, Math.floor(Math.log10(rawStep)));
+        const residual = rawStep / magnitude;
+        if (residual > 5) return 10 * magnitude; if (residual > 2) return 5 * magnitude; if (residual > 1) return 2 * magnitude; return magnitude;
+    }
+    
+    document.addEventListener('DOMContentLoaded', () => {
+        initMap();
+        loadColumnWidths(); // ▼▼▼ ADDED: Load saved widths on start ▼▼▼
+        scriptFunctions.loadHistory();
+        scriptFunctions.renderHistoryTree();
+        scriptFunctions.setupEventListeners();
+        initializeResizers(); 
+        if (!localStorage.getItem(onboardingStorageKey)) onboarding.show();
+    });
+
+    document.getElementById('extract-button').addEventListener('click', function() {
+        const text = document.getElementById('spec-text').value, inputDatumSelect = document.getElementById('input-datum-select');
+        const isNewFormat = text.includes('■最新観測値');
+        let extractionMap, latLonRegex, isLatLonDMS = false;
+
+        if (isNewFormat) {
+            extractionMap = { 'station-name': /^[^\n]+\n([^\n]+)/, 'zero-point': /水位標のゼロ点高\(T\.P\.\)\s*([+-]?[\d\.]+)\s*m/i, 'hinan-level': /氾濫危険水位\s*:\s*([+-]?[\d\.]+)\s*m/i, 'handan-level': /避難判断水位\s*:\s*([+-]?[\d\.]+)\s*m/i, 'chuui-level': /氾濫注意水位\s*:\s*([+-]?[\d\.]+)\s*m/i };
+            latLonRegex = /緯度\s*([\d\.]+)\s*経度\s*([\d\.]+)/; isLatLonDMS = false; inputDatumSelect.value = 'TP';
+        } else {
+            extractionMap = { 'station-name': /(?:観測所名|名称)\s*(.+)/, 'zero-point': /(?:零点高|ゼロ点高)\s*(?:[A-Z\.\s]+)?([+-]?[\d\.]+)\s*m/i, 'keikaku-level': /計画高水位\s*(?:[A-Z\.\s]+)?([+-]?[\d\.]+)\s*m/i, 'hinan-level': /(?:はん濫危険水位|氾濫危険水位)\s*(?:[A-Z\.\s]+)?([+-]?[\d\.]+)\s*m/i, 'handan-level': /避難判断水位\s*(?:[A-Z\.\s]+)?([+-]?[\d\.]+)\s*m/i, 'chuui-level': /(?:はん濫注意水位|氾濫注意水位)\s*(?:[A-Z\.\s]+)?([+-]?[\d\.]+)\s*m/i, 'taiki-level': /水防団待機水位\s*(?:[A-Z\.\s]+)?([+-]?[\d\.]+)\s*m/i };
+            latLonRegex = /世界測地系\s*.*?北緯\s*([\d\s度°分′'秒″\.\-]+)\s*東経\s*([\d\s度°分′'秒″\.\-]+)/; isLatLonDMS = true;
+        }
+
+        if (!inputDatumSelect.value) { alert('諸元表に記載されている「零点高」の基準面（例: T.P.、A.P.など）に合わせて、プルダウンから同じものを選択してください。'); inputDatumSelect.focus(); return; }
+        
+        const selectedOption = inputDatumSelect.selectedOptions[0], inputDatumOffset = parseFloat(selectedOption.dataset.offset), inputDatumName = selectedOption.dataset.name;
+        let foundCount = 0;
+        ['keikaku-level', 'taiki-level'].forEach(id => { const el = document.getElementById(id); if(el) el.value = ''; });
+
+        for (const id in extractionMap) {
+            const match = text.match(extractionMap[id]), element = document.getElementById(id);
+            if (!element) continue;
+            element.classList.remove('extracted');
+            if (match && match[1]) {
+                const extractedValueStr = match[1].trim();
+                if (id === 'station-name') { element.value = extractedValueStr; } 
+                else { const extractedValue = parseFloat(extractedValueStr); if (isNaN(extractedValue)) continue; if (id === 'zero-point') { element.value = (extractedValue + (isNewFormat ? 0 : inputDatumOffset)).toFixed(4); } else { element.value = extractedValue.toFixed(4); } }
+                element.classList.add('extracted'); foundCount++;
+            }
+        }
+        
+        const latElement = document.getElementById('latitude'), lonElement = document.getElementById('longitude');
+        latElement.classList.remove('extracted'); lonElement.classList.remove('extracted');
+        
+        const latLonMatch = text.match(latLonRegex);
+        if (latLonMatch && latLonMatch[1] && latLonMatch[2]) {
+            let latDD, lonDD;
+            if (isLatLonDMS) { latDD = convertDMSToDD(latLonMatch[1].trim()); lonDD = convertDMSToDD(latLonMatch[2].trim()); } 
+            else { latDD = parseFloat(latLonMatch[1].trim()); lonDD = parseFloat(latLonMatch[2].trim()); }
+            if (latDD !== null && !isNaN(latDD) && lonDD !== null && !isNaN(lonDD)) {
+                latElement.value = latDD.toFixed(6); lonElement.value = lonDD.toFixed(6);
+                latElement.classList.add('extracted'); lonElement.classList.add('extracted'); foundCount += 2;
+            }
+        }
+
+        if (foundCount > 0) {
+            const message = isNewFormat ? `✅ ${foundCount}個の情報を抽出し、零点高をT.P.基準で入力しました。\n内容を確認し、不足分を入力してください。` : `✅ ${foundCount}個の情報を抽出し、零点高を ${inputDatumName} からT.P.基準に換算しました。\n内容を確認し、不足分を入力してください。`;
+            alert(message);
+        } else { alert('⚠️ テキストから情報を抽出できませんでした。テキストの形式を確認してください。'); }
+        updateMap(latElement.value, lonElement.value, document.getElementById('station-name').value);
+    });
+
+    document.getElementById('calculate-button').addEventListener('click', function() {
+        const ui = { inputDatumSelect: document.getElementById('input-datum-select'), datumSelect: document.getElementById('datum-select'), zeroPointInput: document.getElementById('zero-point'), tableHeaderRow: document.querySelector('#result-table thead tr'), tableBody: document.getElementById('result-table-body'), chartArea: document.getElementById('chart-area'), levelAxis: document.getElementById('level-axis'), elevationAxis: document.getElementById('elevation-axis'), elevationAxisLabel: document.getElementById('elevation-axis-label'), stationNameInput: document.getElementById('station-name'), resultTitle: document.getElementById('result-title'), minLevelInput: document.getElementById('min-level'), maxLevelInput: document.getElementById('max-level'), latitudeInput: document.getElementById('latitude'), longitudeInput: document.getElementById('longitude'), rightPane: document.getElementById('col-c') };
+        const formValues = { keikaku: parseFloat(document.getElementById('keikaku-level').value), hinan: parseFloat(document.getElementById('hinan-level').value), handan: parseFloat(document.getElementById('handan-level').value), chuui: parseFloat(document.getElementById('chuui-level').value), taiki: parseFloat(document.getElementById('taiki-level').value), current: parseFloat(document.getElementById('current-level').value), locationElevation: parseFloat(document.getElementById('location-elevation').value), evacPrepareOffset: parseFloat(document.getElementById('evacuation-prepare-offset').value), evacStartOffset: parseFloat(document.getElementById('evacuation-start-offset').value), observationDateTime: document.getElementById('observation-datetime').value.trim() };
+
+        if (ui.inputDatumSelect.value && ui.datumSelect.value && ui.inputDatumSelect.value !== ui.datumSelect.value) {
+            const inputDatumText = ui.inputDatumSelect.selectedOptions[0].text.split(' ')[0], datumText = ui.datumSelect.selectedOptions[0].text.split(' ')[0];
+            if (!confirm(`諸元表の基準面 (${inputDatumText}) と表示用の基準面 (${datumText}) が異なっています。\n\nこのまま計算を実行してもよろしいですか？`)) return;
+        }
+        const zeroPoint = parseFloat(ui.zeroPointInput.value);
+        if (isNaN(zeroPoint)) { alert('⚠️ 必須項目「水位標のゼロ点高」を入力してください。'); return; }
+        
+        const selectedOption = ui.datumSelect.selectedOptions[0], datumName = selectedOption.dataset.name, datumOffset = parseFloat(selectedOption.dataset.offset), isTpSelected = (datumName === 'T.P.');
+        ui.tableBody.innerHTML = ''; ui.tableHeaderRow.innerHTML = isTpSelected ? '<th>水位の名称</th><th>水位 (m)</th><th>標高 (T.P. m)</th>' : `<th>水位の名称</th><th>水位 (m)</th><th>標高 (T.P. m)</th><th>標高 (${datumName} m)</th>`;
+        ui.elevationAxisLabel.textContent = isTpSelected ? `標高 (T.P. m)` : `標高 (${datumName} m)`;
+        
+        const levelsData = [ { id: 'keikaku', name: '計画高水位', level: formValues.keikaku, centerTop: true }, { id: 'hinan', name: '氾濫危険水位', level: formValues.hinan }, { id: 'handan', name: '避難判断水位', level: formValues.handan }, { id: 'chuui', name: '氾濫注意水位', level: formValues.chuui }, { id: 'taiki', 'name': '水防団待機水位', level: formValues.taiki }, { id: 'current', name: '現在の水位', level: formValues.current } ];
+        if (!isNaN(formValues.locationElevation)) {
+            const locationWaterLevel = formValues.locationElevation - zeroPoint;
+            levelsData.push({ id: 'location', name: '現在地', level: locationWaterLevel });
+            if (!isNaN(formValues.evacPrepareOffset) && formValues.evacPrepareOffset > 0) levelsData.push({ id: 'evacuation-prepare', name: '避難準備開始', level: locationWaterLevel - formValues.evacPrepareOffset, centerTop: true });
+            if (!isNaN(formValues.evacStartOffset) && formValues.evacStartOffset > 0) levelsData.push({ id: 'evacuation-start', name: '避難開始', level: locationWaterLevel - formValues.evacStartOffset, centerTop: true });
+        }
+        
+        ui.chartArea.innerHTML = ''; ui.levelAxis.innerHTML = '<div class="axis-label">水位 (m)</div>'; ui.elevationAxis.innerHTML = `<div class="axis-label" id="elevation-axis-label">${isTpSelected ? "標高 (T.P. m)" : `標高 (${datumName} m)`}</div>`;
+        const stationName = ui.stationNameInput.value;
+        ui.resultTitle.textContent = stationName ? `📈 C. 変換結果 (${stationName})` : '📈 C. 変換結果';
+        const validLevels = levelsData.filter(item => !isNaN(item.level));
+        if (validLevels.length === 0) { ui.tableBody.innerHTML = `<tr><td colspan="${isTpSelected ? 3 : 4}">表示できる有効な水位データがありません。</td></tr>`; return; }
+
+        validLevels.sort((a, b) => b.level - a.level).filter(item => !['evacuation-prepare', 'evacuation-start'].includes(item.id)).forEach(item => {
+            const elevationTP = (item.level + zeroPoint), row = ui.tableBody.insertRow();
+            if (item.id === 'current') row.className = 'highlight-current'; if (item.id === 'location') row.className = 'highlight-location';
+            let rowHTML = `<td><strong>${item.name}</strong></td><td>${item.level.toFixed(2)} m</td><td class="el-value">${elevationTP.toFixed(2)} m</td>`;
+            if (!isTpSelected) rowHTML += `<td class="el-value">${(elevationTP - datumOffset).toFixed(2)} m</td>`; row.innerHTML = rowHTML;
+        });
+        
+        const userMinLevel = parseFloat(ui.minLevelInput.value), userMaxLevel = parseFloat(ui.maxLevelInput.value);
+        let chartMinLevel = isNaN(userMinLevel) ? 0 : userMinLevel, chartMaxLevel;
+        if (!isNaN(userMaxLevel) && userMaxLevel > chartMinLevel) { chartMaxLevel = userMaxLevel; } 
+        else {
+            const maxLevelValue = Math.max(...validLevels.map(item => item.level), chartMinLevel), keikakuLevel = formValues.keikaku;
+            const topValue = !isNaN(keikakuLevel) && keikakuLevel > maxLevelValue ? keikakuLevel : maxLevelValue;
+            if (topValue <= chartMinLevel) chartMaxLevel = chartMinLevel + 10;
+            else { const range = topValue - chartMinLevel, expandedRange = range / 0.85, niceStep = calculateNiceTickStep(expandedRange, 5); chartMaxLevel = Math.ceil((chartMinLevel + expandedRange) / niceStep) * niceStep; }
+        }
+        if (chartMinLevel >= chartMaxLevel) chartMaxLevel = chartMinLevel + 10;
+        
+        const chartRange = chartMaxLevel - chartMinLevel; if (chartRange <= 0) return;
+        const axisStep = calculateNiceTickStep(chartRange, 10), startTick = Math.ceil(chartMinLevel / axisStep) * axisStep;
+
+        for (let i = startTick; i <= chartMaxLevel; i += axisStep) {
+            if (i < chartMinLevel) continue;
+            const bottomPercent = ((i - chartMinLevel) / chartRange) * 100;
+            if (bottomPercent > 100) continue;
+            const gridLine = document.createElement('div'); gridLine.className = 'grid-line'; gridLine.style.bottom = `${bottomPercent}%`; ui.chartArea.appendChild(gridLine);
+            const levelTick = document.createElement('div'); levelTick.className = 'tick'; levelTick.style.bottom = `${bottomPercent}%`; levelTick.textContent = `${i.toFixed(i % 1 !== 0 ? 1 : 0)}m`; ui.levelAxis.appendChild(levelTick);
+            const levelTickMark = document.createElement('div'); levelTickMark.className = 'tick-mark'; levelTickMark.style.bottom = `${bottomPercent}%`; ui.levelAxis.appendChild(levelTickMark);
+            const elevationValueTP = i + zeroPoint, elevationTick = document.createElement('div'); elevationTick.className = 'tick'; elevationTick.style.bottom = `${bottomPercent}%`;
+            elevationTick.textContent = isTpSelected ? `${elevationValueTP.toFixed(2)}m` : `${(elevationValueTP - datumOffset).toFixed(2)}m`; ui.elevationAxis.appendChild(elevationTick);
+            const elevationTickMark = document.createElement('div'); elevationTickMark.className = 'tick-mark'; elevationTickMark.style.bottom = `${bottomPercent}%`; ui.elevationAxis.appendChild(elevationTickMark);
+        }
+
+        const currentLevelItem = validLevels.find(item => item.id === 'current');
+        if (currentLevelItem && currentLevelItem.level >= chartMinLevel) {
+            const heightPercent = Math.min(100, ((currentLevelItem.level - chartMinLevel) / chartRange) * 100), currentWaterDiv = document.createElement('div');
+            currentWaterDiv.className = 'current-water-level'; currentWaterDiv.style.height = `${heightPercent}%`;
+            if (heightPercent > 5) { const labelText = formValues.observationDateTime ? `${formValues.observationDateTime.replace(/ /g, '_')}_水位: ${currentLevelItem.level.toFixed(2)}m` : `現在水位: ${currentLevelItem.level.toFixed(2)}m`; currentWaterDiv.innerHTML = `<div class="current-water-label">${labelText}</div>`; }
+            ui.chartArea.appendChild(currentWaterDiv);
+        }
+        validLevels.filter(item => item.id !== 'current').forEach(item => {
+            if (item.level < chartMinLevel || item.level > chartMaxLevel) return;
+            const bottomPercent = ((item.level - chartMinLevel) / chartRange) * 100, line = document.createElement('div'); line.className = 'level-line'; line.id = `line-${item.id}`; line.style.bottom = `${bottomPercent}%`;
+            line.innerHTML = `<span class="${item.centerTop ? 'level-label center-top' : 'level-label'}">${item.name} ${item.level.toFixed(2)}m</span>`; ui.chartArea.appendChild(line);
+        });
+
+        if (ui.rightPane) {
+            ui.rightPane.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        }
+        updateMap(ui.latitudeInput.value, ui.longitudeInput.value, stationName);
+    });
+    
+    function closeModal() { saveModal.style.display = 'none'; }
+    
+    const scriptFunctions = {
+        loadHistory: () => { const saved = localStorage.getItem(historyStorageKey); historyData = saved ? JSON.parse(saved) : []; },
+        saveHistory: () => { localStorage.setItem(historyStorageKey, JSON.stringify(historyData)); },
+        renderHistoryTree: () => {
+            if (historyData.length === 0) { historyTreeContainer.innerHTML = '<p style="color: #6c757d; text-align: center; padding-top: 20px;">保存された履歴はありません。</p>'; return; }
+            const grouped = historyData.reduce((acc, item) => {
+                const suikei = item.suikei || '未分類', kasen = item.kasen || '未分類';
+                if (!acc[suikei]) acc[suikei] = {}; if (!acc[suikei][kasen]) acc[suikei][kasen] = [];
+                acc[suikei][kasen].push(item); return acc;
+            }, {});
+            let html = '<ul class="history-tree">';
+            for (const suikei of Object.keys(grouped).sort()) {
+                html += `<li><details open><summary><strong>${suikei}</strong></summary><ul>`;
+                for (const kasen of Object.keys(grouped[suikei]).sort()) {
+                    html += `<li><details open><summary><em>${kasen}</em></summary><ul>`;
+                    grouped[suikei][kasen].sort((a,b) => a.displayName.localeCompare(b.displayName, 'ja')).forEach(item => {
+                        html += `<li class="tree-item ${item.id === activeHistoryId ? 'active' : ''}" data-id="${item.id}"><span>${item.displayName}</span><button class="delete-btn" data-id="${item.id}" title="削除">×</button></li>`;
+                    });
+                    html += '</ul></details></li>';
+                }
+                html += '</ul></details></li>';
+            }
+            historyTreeContainer.innerHTML = html + '</ul>';
+        },
+        setupEventListeners: () => {
+            document.getElementById('show-save-modal-button').addEventListener('click', () => {
+                const specText = document.getElementById('spec-text').value, stationNameInput = document.getElementById('station-name');
+                document.getElementById('save-station').value = stationNameInput.value;
+                const saveSuikeiInput = document.getElementById('save-suikei'), saveKasenInput = document.getElementById('save-kasen');
+                let suikeiMatch, kasenMatch;
+                if (specText.includes('■最新観測値')) { suikeiMatch = specText.match(/[^\n]*すいけい\n([^\n]*水系)/); kasenMatch = specText.match(/[^\n]*(?:かわ|がわ)\n([^\n]*(?:川|がわ))/); } 
+                else { suikeiMatch = specText.match(/水系名\s*(.+)/); kasenMatch = specText.match(/河川名\s*(.+)/); }
+                saveSuikeiInput.value = suikeiMatch ? suikeiMatch[1].trim() : ''; saveKasenInput.value = kasenMatch ? kasenMatch[1].trim() : '';
+                if (!saveSuikeiInput.value && !saveKasenInput.value && stationNameInput.value) { const existing = historyData.find(item => item.station === stationNameInput.value); if(existing){ saveSuikeiInput.value = existing.suikei; saveKasenInput.value = existing.kasen; } }
+                document.getElementById('save-location-name').value = ''; saveModal.style.display = 'flex';
+            });
+            
+            document.getElementById('cancel-save-button').addEventListener('click', closeModal);
+            saveModal.addEventListener('click', (e) => { if (e.target === saveModal) closeModal(); });
+
+            document.getElementById('confirm-save-button').addEventListener('click', () => {
+                const suikei = document.getElementById('save-suikei').value.trim(), kasen = document.getElementById('save-kasen').value.trim(), station = document.getElementById('station-name').value.trim(), locationName = document.getElementById('save-location-name').value.trim();
+                if (!suikei || !kasen) { alert('⚠️ 水系名と河川名は必須です。'); return; }
+                const displayName = station + (locationName ? ` (${locationName})` : ''), newEntry = { id: `hist_${new Date().getTime()}`, suikei, kasen, station, locationName, displayName, formData: {} };
+                savableFieldIds.forEach(id => { const el = document.getElementById(id); if (el) newEntry.formData[id] = el.value; });
+                historyData.push(newEntry); scriptFunctions.saveHistory(); activeHistoryId = newEntry.id; scriptFunctions.renderHistoryTree(); closeModal(); alert('✅ 設定を保存しました。');
+            });
+            
+            historyTreeContainer.addEventListener('click', (e) => {
+                const target = e.target;
+                if (target.matches('.delete-btn, .delete-btn *')) {
+                    const idToDelete = target.closest('.delete-btn').dataset.id;
+                    if (confirm('本当にこの履歴を削除しますか？')) {
+                        historyData = historyData.filter(item => item.id !== idToDelete); scriptFunctions.saveHistory();
+                        if (activeHistoryId === idToDelete) activeHistoryId = null;
+                        scriptFunctions.renderHistoryTree();
+                    }
+                } else if (target.closest('.tree-item')) {
+                    const idToLoad = target.closest('.tree-item').dataset.id, dataToLoad = historyData.find(item => item.id === idToLoad);
+                    if (dataToLoad) {
+                        savableFieldIds.forEach(id => { const el = document.getElementById(id); if(el) { el.value = ''; el.classList.remove('extracted'); } });
+                        for (const id in dataToLoad.formData) { const el = document.getElementById(id); if (el && dataToLoad.formData[id] !== undefined) el.value = dataToLoad.formData[id]; }
+                        activeHistoryId = idToLoad; scriptFunctions.renderHistoryTree(); document.getElementById('calculate-button').click();
+                    }
+                }
+            });
+
+            document.getElementById('export-button').addEventListener('click', () => {
+                if (historyData.length === 0) { alert('ℹ️ エクスポートできる保存履歴がありません。'); return; }
+                const dataStr = JSON.stringify(historyData, null, 2), dataBlob = new Blob([dataStr], { type: 'application/json' }), a = document.createElement('a');
+                a.href = URL.createObjectURL(dataBlob); a.download = `water_level_converter_backup_${new Date().toISOString().slice(0,10)}.json`;
+                document.body.appendChild(a); a.click(); document.body.removeChild(a); URL.revokeObjectURL(a.href);
+            });
+            
+            const importFileInput = document.getElementById('import-file-input');
+            document.getElementById('import-button').addEventListener('click', () => { importFileInput.click(); });
+            importFileInput.addEventListener('change', (e) => {
+                const file = e.target.files[0]; if (!file) return;
+                const reader = new FileReader();
+                reader.onload = (event) => {
+                    try {
+                        const importedData = JSON.parse(event.target.result);
+                        if (Array.isArray(importedData) && importedData.every(item => item.id && item.displayName && item.formData)) {
+                            if (confirm('現在の履歴をインポートした内容で上書きしますか？\n（現在の履歴は失われます）')) {
+                                historyData = importedData; scriptFunctions.saveHistory(); activeHistoryId = null;
+                                scriptFunctions.renderHistoryTree(); alert('✅ 履歴をインポートしました。');
+                            }
+                        } else { alert('⚠️ ファイルの形式が正しくありません。'); }
+                    } catch (err) { alert('⚠️ ファイルの読み込みに失敗しました。'); }
+                };
+                reader.readAsText(file); e.target.value = '';
+            });
+
+            document.getElementById('show-help-button').addEventListener('click', () => onboarding.show());
+
+            document.getElementById('sample-data-button').addEventListener('click', () => {
+                const sampleData = { specText: `水系名	荒川水系\n河川名	荒川\n観測所名	岩淵水門（上）（いわぶちすいもん（かみ））\n所在地	東京都北区志茂5丁目\n緯度経度	世界測地系　北緯 35度47分15秒　東経 139度43分38秒\n零点高	A.P.+2.10m\n計画高水位	8.57m\nはん濫危険水位	7.70m\n避難判断水位	6.50m\nはん濫注意水位	4.10m\n水防団待機水位	3.00m\n`, inputDatum: 'AP_ARAKAWA', currentLevel: '3.15', locationElevation: '6.8', evacuationPrepareOffset: '2.0', evacuationStartOffset: '1.5', observationDateTime: new Date().toLocaleString('sv-SE').replace(' ', ' ').slice(0, 16) };
+                document.getElementById('spec-text').value = sampleData.specText;
+                document.getElementById('input-datum-select').value = sampleData.inputDatum;
+                document.getElementById('current-level').value = sampleData.currentLevel;
+                document.getElementById('location-elevation').value = sampleData.locationElevation;
+                document.getElementById('evacuation-prepare-offset').value = sampleData.evacuationPrepareOffset;
+                document.getElementById('evacuation-start-offset').value = sampleData.evacuationStartOffset;
+                document.getElementById('observation-datetime').value = sampleData.observationDateTime.replace('T', ' ');
+                document.getElementById('extract-button').click();
+                setTimeout(() => { document.getElementById('calculate-button').click(); }, 100);
+            });
+
+            document.getElementById('toggle-history-panel').addEventListener('click', (e) => {
+                const mainLayout = document.getElementById('main-layout');
+                const historyPanel = document.getElementById('col-h');
+                const isCollapsed = mainLayout.classList.toggle('history-collapsed');
+                historyPanel.classList.toggle('collapsed', isCollapsed);
+                e.target.innerHTML = isCollapsed ? '«' : '»'; e.target.title = isCollapsed ? 'パネルを展開' : 'パネルを折りたたむ';
+                setTimeout(() => {
+                    if (map) map.invalidateSize()
+                }, 400);
+            });
+        }
+    };
+</script>
+
+</body>
+</html>
