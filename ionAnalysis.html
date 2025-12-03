@@ -1,0 +1,1314 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>イオン分析結果・整理ツール</title>
+    <link rel="icon" href='data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🧪</text></svg>'>
+
+    <!-- Handsontable (表計算ライブラリ) -->
+    <script src="https://cdn.jsdelivr.net/npm/handsontable@6.2.2/dist/handsontable.full.min.js"></script>
+    <link href="https://cdn.jsdelivr.net/npm/handsontable@6.2.2/dist/handsontable.full.min.css" rel="stylesheet">
+    
+    <!-- Plotly.js (グラフ描画ライブラリ) -->
+    <script src="https://cdn.plot.ly/plotly-2.27.0.min.js"></script>
+    
+    <style>
+        body { margin: 0; padding: 0; font-family: "Helvetica Neue", Arial, sans-serif; height: 100vh; display: flex; overflow: hidden; color: #333; }
+        
+        /* --- サイドバー (ダークテーマ) --- */
+        .sidebar {
+            width: 340px; 
+            background-color: #1e2634; 
+            color: #ecf0f1; 
+            padding: 15px;
+            display: flex; 
+            flex-direction: column; 
+            gap: 15px; 
+            overflow-y: auto; 
+            border-right: 1px solid #000; 
+            flex-shrink: 0;
+            box-sizing: border-box;
+            z-index: 10;
+        }
+
+        .sidebar-title {
+            display: flex; align-items: center; justify-content: center; margin-bottom: 5px; color: #fff;
+            font-size: 16px; font-weight: bold;
+        }
+
+        /* ヘルプボタンのスタイル */
+        .help-icon {
+            background: #6c757d;
+            color: white;
+            border: none;
+            border-radius: 50%;
+            width: 20px;
+            height: 20px;
+            font-size: 12px;
+            font-weight: bold;
+            cursor: pointer;
+            margin-left: 10px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.3);
+            transition: background 0.2s;
+        }
+        .help-icon:hover { background: #95a5a6; }
+
+        .sidebar-panel {
+            background: #2c3e50; 
+            padding: 10px; 
+            border-radius: 6px; 
+            border: 1px solid #455a64;
+            margin-bottom: 0;
+            transition: all 0.2s;
+        }
+
+        .sidebar h3 { 
+            margin: 0 0 10px 0; 
+            font-size: 13px; 
+            color: #bdc3c7; 
+            border-bottom: 1px solid #555; 
+            padding-bottom: 5px; 
+        }
+
+        /* 折りたたみ可能なヘッダー */
+        .collapsible-header {
+            cursor: pointer;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            user-select: none;
+        }
+        .collapsible-header:hover {
+            color: #fff;
+        }
+        .arrow-icon {
+            font-size: 10px;
+            transition: transform 0.2s;
+        }
+        
+        /* ボタン群 */
+        .btn-group { display: flex; gap: 5px; margin-bottom: 5px; }
+        .btn-sidebar {
+            flex: 1; padding: 8px; border: none; border-radius: 4px; color: white; cursor: pointer; 
+            font-size: 12px; font-weight: bold; text-align: center; transition: opacity 0.2s;
+            display: inline-flex; align-items: center; justify-content: center;
+        }
+        .btn-sidebar:hover { opacity: 0.9; }
+        
+        .btn-blue { background-color: #2980b9; }
+        .btn-green { background-color: #27ae60; }
+        .btn-orange { background-color: #d35400; }
+        .btn-gray { background-color: #7f8c8d; }
+
+        /* 入力・セレクト・トグル */
+        .control-item { margin-bottom: 12px; }
+        .control-label { display: block; font-size: 12px; color: #ccc; margin-bottom: 4px; }
+        
+        select.dark-input {
+            width: 100%; padding: 6px; border-radius: 4px; border: 1px solid #555; 
+            background: #34495e; color: #fff; font-size: 13px; cursor: pointer;
+        }
+
+        label.toggle { 
+            display: flex; align-items: center; cursor: pointer; font-size: 12px; user-select: none; color: #ecf0f1; 
+            padding: 4px 0;
+        }
+        label.toggle input { margin-right: 8px; cursor: pointer; }
+
+        /* スライダー用スタイル */
+        input[type=range] {
+            width: 100%; margin: 5px 0; cursor: pointer;
+        }
+        .slider-val { float: right; color: #3498db; font-weight: bold; }
+
+        /* フィルタリスト */
+        .filter-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 5px; font-size: 12px; }
+        .filter-title { color: #bdc3c7; font-weight: bold; }
+        .filter-actions a { color: #64b5f6; cursor: pointer; margin-left: 8px; text-decoration: none; }
+        .filter-actions a:hover { text-decoration: underline; }
+
+        .checkbox-list { 
+            list-style: none; padding: 5px; margin: 0; max-height: 150px; overflow-y: auto; 
+            border: 1px solid #455a64; background: #34495e; border-radius: 4px; 
+        }
+        .checkbox-item { 
+            padding: 2px 4px; border-bottom: 1px solid #455a64; font-size: 12px; display: flex; align-items: center; color: #ecf0f1; 
+        }
+        .checkbox-item:last-child { border-bottom: none; }
+        .checkbox-item:hover { background: #2c3e50; }
+        .checkbox-item label { cursor: pointer; width: 100%; display: flex; align-items: center; }
+        .checkbox-item input { margin-right: 6px; }
+
+        /* スクロールバー */
+        ::-webkit-scrollbar { width: 8px; height: 8px; }
+        ::-webkit-scrollbar-track { background: #2c3e50; }
+        ::-webkit-scrollbar-thumb { background: #555; border-radius: 4px; }
+        ::-webkit-scrollbar-thumb:hover { background: #777; }
+
+        /* --- メインコンテンツ --- */
+        #main-content { flex-grow: 1; display: flex; flex-direction: column; overflow-y: auto; padding: 20px; background: #f4f6f7; position: relative; }
+        
+        /* タブ */
+        .tabs { display: flex; gap: 4px; border-bottom: 2px solid #2c3e50; margin-bottom: 10px; }
+        .tab { 
+            padding: 8px 20px; cursor: pointer; background: #bdc3c7; 
+            border: 1px solid #95a5a6; border-bottom: none; border-radius: 4px 4px 0 0; 
+            font-size: 13px; font-weight: bold; color: #2c3e50; transition: 0.2s; min-width: 100px; text-align: center;
+        }
+        .tab:hover { background: #d0d7de; }
+        .tab.active { background: #2c3e50; color: #fff; border-color: #2c3e50; }
+        
+        .chart-view { display: none; height: 100%; width: 100%; flex-grow: 1; }
+        .chart-view.active { display: block; }
+        
+        /* グラフエリアスタイル */
+        /* ヘキサ(個別)用レイアウト */
+        #hexa-wrapper {
+            display: flex; height: 100%; width: 100%;
+            border: 1px solid #ccc; background: #fff;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            border-radius: 4px; overflow: hidden;
+        }
+        #hexa-grid { 
+            flex-grow: 1; height: 100%; overflow-y: auto; 
+            padding: 20px; box-sizing: border-box;
+            border-right: 1px solid #ddd;
+            display: grid; 
+            grid-template-columns: repeat(auto-fill, minmax(340px, 1fr)); 
+            gap: 20px; 
+            align-content: start;
+        }
+        #hexa-legend-individual {
+            width: 250px; flex-shrink: 0; height: 100%;
+            overflow-y: auto; background: #fafafa; padding: 15px;
+            box-sizing: border-box; font-size: 12px;
+        }
+
+        .hexa-card { border: 1px solid #eee; padding: 10px; text-align: center; border-radius: 4px; box-shadow: 0 2px 4px rgba(0,0,0,0.05); transition: transform 0.2s; background: #fff; display:flex; flex-direction:column; align-items:center; justify-content:center;}
+        .hexa-card:hover { transform: translateY(-2px); box-shadow: 0 4px 8px rgba(0,0,0,0.1); }
+        .hexa-meta { font-size: 12px; color: #555; margin-bottom: 5px; text-align: center; font-weight: bold; border-bottom:1px solid #eee; padding-bottom:5px; width:100%;}
+
+        /* トリリニア用レイアウト */
+        #piper-wrapper {
+            display: flex; height: 100%; width: 100%;
+            border: 1px solid #ccc; background: #fff;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            border-radius: 4px; overflow: hidden;
+        }
+        #piper-plot {
+            flex-grow: 1; height: 100%; min-height: 0;
+            background: #fff;
+            border-right: 1px solid #ddd;
+        }
+        #piper-legend {
+            width: 250px; flex-shrink: 0; height: 100%;
+            overflow-y: auto; background: #fafafa; padding: 15px;
+            box-sizing: border-box; font-size: 12px;
+            border-left: 1px solid #ddd;
+        }
+
+        /* ヘキサ重ね合わせ表示エリア */
+        #hexa-overlay-wrapper { 
+            height: 100%; display: flex; flex-direction: row; 
+            border: 1px solid #ccc; border-radius: 4px; overflow: hidden; background: #fff; 
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        #hexa-chart-container { flex-grow: 1; height: 100%; overflow-y: auto; padding: 10px; box-sizing: border-box; display: flex; justify-content: center; align-items: flex-start; border-right: 1px solid #ddd; }
+        #hexa-overlay-single { width: 100%; height: 100%; display: flex; justify-content: center; align-items: center; }
+        #hexa-overlay-grid { width: 100%; display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 20px; padding-bottom: 20px; }
+        
+        /* 凡例共通スタイル */
+        #hexa-legend { width: 250px; flex-shrink: 0; height: 100%; overflow-y: auto; background: #fafafa; padding: 15px; box-sizing: border-box; font-size: 12px; }
+        .legend-item { display: flex; align-items: center; margin-bottom: 8px; line-height: 1.2; }
+        .color-box { width: 12px; height: 12px; display: inline-block; margin-right: 8px; border-radius: 2px; flex-shrink: 0; }
+
+        /* モーダル共通スタイル */
+        .modal-overlay {
+            display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(0,0,0,0.6); z-index: 1000; justify-content: center; align-items: center;
+        }
+        .modal-overlay.show { display: flex; }
+        
+        /* データ編集モーダル */
+        #data-modal { z-index: 1000; }
+        .modal-content {
+            background: #fff; width: 90%; max-width: 1200px; height: 85vh;
+            border-radius: 6px; box-shadow: 0 10px 25px rgba(0,0,0,0.3);
+            display: flex; flex-direction: column; padding: 20px;
+        }
+        .modal-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px; border-bottom: 1px solid #eee; padding-bottom: 10px; }
+        .modal-body { flex-grow: 1; overflow: hidden; position: relative; margin-bottom: 15px; border: 1px solid #ccc; }
+        .modal-footer { display: flex; justify-content: flex-end; gap: 10px; }
+        
+        /* ヘルプモーダル */
+        #help-modal { z-index: 2000; }
+        .help-modal-content {
+            background: #fff; width: 600px; max-width: 90%; max-height: 85vh;
+            border-radius: 8px; box-shadow: 0 10px 25px rgba(0,0,0,0.5);
+            display: flex; flex-direction: column; overflow: hidden;
+        }
+        .help-header {
+            background: #2c3e50; color: #fff; padding: 15px 20px;
+            display: flex; justify-content: space-between; align-items: center;
+        }
+        .help-header h2 { margin: 0; font-size: 18px; }
+        .close-btn { background: none; border: none; color: #fff; font-size: 24px; cursor: pointer; line-height: 1; }
+        .close-btn:hover { color: #e74c3c; }
+        
+        .help-body { padding: 20px; overflow-y: auto; color: #333; line-height: 1.6; }
+        .help-body h3 { border-bottom: 2px solid #3498db; padding-bottom: 5px; margin-top: 20px; margin-bottom: 10px; font-size: 16px; color: #2c3e50; }
+        .help-body h3:first-child { margin-top: 0; }
+        .help-body p { font-size: 14px; margin-bottom: 10px; }
+        .help-body ul { margin: 0 0 10px 20px; padding: 0; font-size: 14px; }
+        .help-body li { margin-bottom: 5px; }
+        .help-body code { background: #f1f2f6; padding: 2px 5px; border-radius: 3px; font-family: monospace; color: #c0392b; }
+
+        /* ヘルプ内テーブルスタイル */
+        .help-table {
+            width: 100%; border-collapse: collapse; font-size: 13px; margin-top: 10px;
+        }
+        .help-table th, .help-table td {
+            border: 1px solid #ddd; padding: 6px 10px; text-align: center;
+        }
+        .help-table th { background: #f8f9fa; color: #2c3e50; font-weight: bold; }
+        .help-table tr:nth-child(even) { background: #fcfcfc; }
+        .help-table tr:hover { background: #f0f4f8; }
+
+        button.primary { background-color: #2980b9; color: white; border: none; padding: 8px 20px; border-radius: 4px; cursor: pointer; font-size: 14px; font-weight: bold; }
+        button.primary:hover { background-color: #1f618d; }
+        button.secondary { background-color: #95a5a6; color: white; border: none; padding: 8px 20px; border-radius: 4px; cursor: pointer; font-size: 14px; }
+        button.secondary:hover { background-color: #7f8c8d; }
+
+    </style>
+</head>
+<body>
+
+<!-- サイドバー -->
+<div id="sidebar" class="sidebar">
+    <div class="sidebar-title">
+        <span>🧪 イオン分析結果・整理ツール</span>
+        <button id="btn-help" class="help-icon" onclick="openHelpModal()">?</button>
+    </div>
+
+    <!-- アクションパネル -->
+    <div class="sidebar-panel">
+        <h3>データ操作</h3>
+        <div class="btn-group">
+            <button class="btn-sidebar btn-green" onclick="saveData()">
+                💾 保存
+            </button>
+            <button class="btn-sidebar btn-orange" onclick="document.getElementById('fileInput').click()">
+                📂 読込
+            </button>
+            <input type="file" id="fileInput" accept=".json" style="display: none;" onchange="loadDataFile(this)">
+        </div>
+        <div class="btn-group">
+            <button class="btn-sidebar btn-blue" onclick="openModal()">
+                ✏️ 編集
+            </button>
+            <button class="btn-sidebar btn-gray" onclick="processData()">
+                ↻ 再描画
+            </button>
+        </div>
+    </div>
+
+    <!-- グラフ設定パネル (折りたたみ機能追加) -->
+    <div class="sidebar-panel">
+        <h3 class="collapsible-header" onclick="toggleSidebarPanel('settings-content', 'settings-arrow')">
+            グラフ設定
+            <span id="settings-arrow" class="arrow-icon">▼</span>
+        </h3>
+
+        <!-- 設定コンテンツをラップ -->
+        <div id="settings-content">
+            <!-- 単位切り替え -->
+            <div class="control-item">
+                <span class="control-label">入力データの単位</span>
+                <select id="input-unit" class="dark-input" onchange="processData()">
+                    <option value="mg" selected>mg/L (重量濃度)</option>
+                    <option value="meq">meq/L (当量濃度)</option>
+                </select>
+            </div>
+
+            <hr style="border:0; border-top:1px solid #555; margin:10px 0;">
+            
+            <div class="control-item">
+                <span class="control-label">配色設定</span>
+                <select id="color-mode" class="dark-input" onchange="updateCharts()">
+                    <option value="unique" selected>全て異なる色</option>
+                    <option value="id">番号 (ID) 毎に統一</option>
+                    <option value="date">採取日毎に統一</option>
+                    <option value="mono">全て同じ色 (黒)</option>
+                </select>
+            </div>
+
+            <!-- トリリニア設定 -->
+            <div id="control-piper" class="chart-controls" style="display:block;">
+                <label class="toggle">
+                    <input type="checkbox" id="show-lines" onchange="updateCharts()">
+                    プロット間の連結線を表示
+                </label>
+                <!-- トリリニア用スライダー追加 -->
+                <div class="control-item" style="margin-top:10px; border-top:1px solid #555; padding-top:10px;">
+                    <span class="control-label">プロットサイズ: <span id="val-p-size" class="slider-val">10</span>px</span>
+                    <input type="range" id="piper-marker-size" min="3" max="30" value="10" step="1" 
+                           oninput="document.getElementById('val-p-size').innerText=this.value; updateCharts()">
+                </div>
+            </div>
+
+            <!-- ヘキサ設定 (個別) -->
+            <div id="control-hexa" class="chart-controls" style="display:none;">
+                <div style="display:flex; flex-direction:column; gap:5px;">
+                    <label class="toggle">
+                        <input type="checkbox" id="hexa-uniform-color" onchange="updateCharts()">
+                        全てのグラフを単色にする
+                    </label>
+                    <label class="toggle">
+                        <input type="checkbox" id="hexa-show-no3" onchange="updateCharts()">
+                        SO4軸にNO3を加算表示
+                    </label>
+                    <div class="control-item" style="margin-top:5px;">
+                        <span class="control-label">目盛り (軸) 範囲</span>
+                        <select id="hexa-scale-mode" class="dark-input" onchange="updateCharts()">
+                            <option value="uniform" selected>全データ統一 (最大値)</option>
+                            <option value="individual">個別自動 (データ毎)</option>
+                        </select>
+                    </div>
+                </div>
+            </div>
+
+            <!-- ヘキサ設定 (重ね) -->
+            <div id="control-overlay" class="chart-controls" style="display:none;">
+                <div style="display:flex; flex-direction:column; gap:5px;">
+                    <label class="toggle">
+                        <input type="checkbox" id="overlay-group-by-id" onchange="updateCharts()">
+                        番号(ID)ごとに分割表示
+                    </label>
+                    <label class="toggle">
+                        <input type="checkbox" id="overlay-show-no3" onchange="updateCharts()">
+                        SO4軸にNO3を加算表示
+                    </label>
+                </div>
+            </div>
+
+            <!-- ヘキサ用サイズスライダー (共通) -->
+            <div id="control-hexa-size" class="chart-controls" style="display:none;">
+                <hr style="border:0; border-top:1px solid #555; margin:10px 0;">
+                <div class="control-item">
+                    <span class="control-label">グラフ幅: <span id="val-w" class="slider-val">340</span>px</span>
+                    <input type="range" id="hexa-width" min="200" max="800" value="340" step="10" 
+                           oninput="document.getElementById('val-w').innerText=this.value; updateCharts()">
+                </div>
+                <div class="control-item">
+                    <span class="control-label">グラフ高さ (縦伸長): <span id="val-h" class="slider-val">200</span>px</span>
+                    <input type="range" id="hexa-height" min="150" max="800" value="200" step="10" 
+                           oninput="document.getElementById('val-h').innerText=this.value; updateCharts()">
+                </div>
+                <div class="control-item">
+                    <span class="control-label">文字サイズ: <span id="val-f" class="slider-val">12</span>px</span>
+                    <input type="range" id="hexa-font" min="8" max="24" value="12" step="1" 
+                           oninput="document.getElementById('val-f').innerText=this.value; updateCharts()">
+                </div>
+            </div>
+        </div><!-- /#settings-content -->
+    </div>
+
+    <!-- フィルタパネル -->
+    <div class="sidebar-panel">
+        <div class="filter-header">
+            <span class="filter-title">番号 (ID)</span>
+            <span class="filter-actions">
+                <a onclick="toggleList('list-ids', true)">全選択</a> 
+                <a onclick="toggleList('list-ids', false)">解除</a>
+            </span>
+        </div>
+        <ul id="list-ids" class="checkbox-list"></ul>
+    </div>
+    <div class="sidebar-panel">
+        <div class="filter-header">
+            <span class="filter-title">試料名</span>
+            <span class="filter-actions">
+                <a onclick="toggleList('list-names', true)">全選択</a> 
+                <a onclick="toggleList('list-names', false)">解除</a>
+            </span>
+        </div>
+        <ul id="list-names" class="checkbox-list"></ul>
+    </div>
+    <div class="sidebar-panel">
+        <div class="filter-header">
+            <span class="filter-title">採取日</span>
+            <span class="filter-actions">
+                <a onclick="toggleList('list-dates', true)">全選択</a> 
+                <a onclick="toggleList('list-dates', false)">解除</a>
+            </span>
+        </div>
+        <ul id="list-dates" class="checkbox-list"></ul>
+    </div>
+</div>
+
+<!-- メインコンテンツ -->
+<div id="main-content">
+    <div class="tabs">
+        <div class="tab active" onclick="switchTab('piper', this)">トリリニア</div>
+        <div class="tab" onclick="switchTab('hexa', this)">ヘキサ (個別)</div>
+        <div class="tab" onclick="switchTab('hexa-overlay', this)">ヘキサ (重ね)</div>
+    </div>
+
+    <!-- トリリニアダイヤグラム -->
+    <div id="view-piper" class="chart-view active">
+        <div id="piper-wrapper">
+            <div id="piper-plot"></div>
+            <div id="piper-legend"></div>
+        </div>
+    </div>
+
+    <!-- 個別ヘキサ -->
+    <div id="view-hexa" class="chart-view">
+        <div id="hexa-wrapper">
+            <div id="hexa-grid"></div>
+            <div id="hexa-legend-individual"></div>
+        </div>
+    </div>
+
+    <!-- 重ね合わせヘキサ -->
+    <div id="view-hexa-overlay" class="chart-view">
+        <div id="hexa-overlay-wrapper">
+            <div id="hexa-chart-container"></div>
+            <div id="hexa-legend"></div>
+        </div>
+    </div>
+
+    <!-- フッター -->
+    <div style="height: 20px;"></div>
+    <footer style="width: 100%; background-color: #f3f4f6; border-top: 1px solid #d1d5db; margin-top: auto;">
+        <div style="display: flex; justify-content: space-between; align-items: center; padding: 5px 15px; font-size: 11px; color: #6c757d;">
+            <div style="display: flex; gap: 15px; align-items: center;">
+                <span id="lastUpdated" style="font-weight: 500;">最終更新: 2025/11/28</span>
+                <span style="color: #ccc;">|</span>
+                <span>Copyright &copy; 2025 (株)地圏総合コンサルタント</span>
+            </div>
+            <button id="legal-toggle" style="background: none; border: none; cursor: pointer; color: #2563eb; text-decoration: underline; font-size: 11px; padding: 0;">
+                免責事項を表示 ▼
+            </button>
+        </div>
+        <div id="legal-details" style="display: none; background-color: #fff; padding: 15px 20px; border-top: 1px dashed #e5e7eb; border-bottom: 5px solid #f3f4f6;">
+            <div style="max-width: 800px; margin: 0 auto; font-size: 11px; color: #4b5563; line-height: 1.6;">
+                <div style="text-align: center; margin-bottom: 10px;">Developed by: Naoya.Onozato</div>
+                <div style="background-color: #fff7ed; border: 1px solid #fdba74; color: #c2410c; padding: 8px; border-radius: 4px; margin-bottom: 10px; font-weight: bold; text-align: center;">
+                    ⚠ 本システムの再配布・ソースコードの無断転用を禁止します。
+                </div>
+                <p><strong>【免責事項】</strong> 本システムは水質分析結果の整理および作図作業を支援するツールです。出力結果の妥当性は専門技術者が確認してください。</p>
+                <div style="text-align: center; margin-top: 10px;">
+                    <button onclick="document.getElementById('legal-toggle').click()" style="padding: 3px 10px; font-size: 10px; cursor: pointer;">閉じる ▲</button>
+                </div>
+            </div>
+        </div>
+    </footer>
+    <script>
+        (function() {
+            const toggle = document.getElementById('legal-toggle');
+            const details = document.getElementById('legal-details');
+            if (toggle && details) {
+                toggle.addEventListener('click', function() {
+                    const isHidden = details.style.display === 'none';
+                    details.style.display = isHidden ? 'block' : 'none';
+                    toggle.textContent = isHidden ? '免責事項を閉じる ▲' : '免責事項を表示 ▼';
+                    if (isHidden) setTimeout(() => { document.getElementById('main-content').scrollTo({ top: document.getElementById('main-content').scrollHeight, behavior: 'smooth' }); }, 50);
+                });
+            }
+        })();
+    </script>
+</div>
+
+<!-- データ入力用モーダル -->
+<div id="data-modal" class="modal-overlay">
+    <div class="modal-content">
+        <div class="modal-header">
+            <div>
+                <h2 style="border:none; margin:0; padding:0; display:inline-block; margin-right:10px;">データ入力・編集</h2>
+                <span style="font-size:12px; color:#666;">Excelデータをコピーして貼り付け (Ctrl+V) できます</span>
+            </div>
+            <div id="modal-unit-badge" style="background:#e8f6f3; color:#16a085; padding:6px 15px; border-radius:4px; font-weight:bold; font-size:14px; border:1px solid #16a085;">
+                入力単位: mg/L
+            </div>
+        </div>
+        <div class="modal-body">
+            <div id="hot-container" style="width:100%; height:100%; overflow: hidden;"></div>
+        </div>
+        <div class="modal-footer">
+            <button class="secondary" onclick="closeModal(false)">キャンセル</button>
+            <button class="primary" onclick="closeModal(true)">グラフに反映して閉じる</button>
+        </div>
+    </div>
+</div>
+
+<!-- ヘルプ用モーダル -->
+<div id="help-modal" class="modal-overlay">
+    <div class="help-modal-content">
+        <div class="help-header">
+            <h2>使い方ガイド</h2>
+            <button class="close-btn" onclick="closeHelpModal()">×</button>
+        </div>
+        <div class="help-body">
+            <section>
+                <h3>📌 概要</h3>
+                <p>水質分析データ（主要イオン）から、トリリニアダイアグラムおよびヘキサダイアグラムを自動作成・整理するツールです。</p>
+            </section>
+            
+            <section>
+                <h3>✏️ データ入力</h3>
+                <p>サイドバーの「<strong>✏️ 編集</strong>」ボタンから入力画面を開きます。</p>
+                <ul>
+                    <li><strong>Excel連携:</strong> Excelのデータをコピーして、グリッド上で <code>Ctrl+V</code> で貼り付け可能です。</li>
+                    <li><strong>単位設定:</strong> 入力値が <code>mg/L</code> か <code>meq/L</code> かをサイドバーで正しく選択してください。</li>
+                </ul>
+            </section>
+
+            <section>
+                <h3>📊 グラフ機能</h3>
+                <ul>
+                    <li><strong>トリリニア:</strong> 組成比を三角図・菱形図にプロットします。プロットサイズはスライダーで調整可能です。</li>
+                    <li><strong>ヘキサ(個別):</strong> 全データを一覧表示します。スライダーでサイズ調整が可能です。</li>
+                    <li><strong>ヘキサ(重ね):</strong> 複数のグラフを重ねて比較します。IDごとのグループ化も可能です。</li>
+                </ul>
+            </section>
+
+            <section>
+                <h3>⚙️ カスタマイズ</h3>
+                <ul>
+                    <li><strong>配色:</strong> ID別、採取日別、単色などから選択できます。チェックボックスで非表示にしても配色は維持されます。</li>
+                    <li><strong>NO<sub>3</sub>表示:</strong> 硝酸イオンをSO<sub>4</sub>軸に加算して表示可能です。</li>
+                    <li><strong>保存機能:</strong> 「💾 保存」で現在の状態をファイル(JSON)に書き出し、「📂 読込」で復元できます。</li>
+                </ul>
+            </section>
+            
+            <div style="margin-top:20px; padding:10px; background:#f8f9fa; border-radius:4px; font-size:12px; color:#666;">
+                ※画面上のグラフは Plotly.js を使用しており、ドラッグでの移動や拡大縮小、カメラアイコンでの画像保存が可能です。
+            </div>
+            
+            <section style="margin-top:20px; border-top:1px dashed #ccc; padding-top:10px;">
+                <h3>⚗️ 換算係数表 (参考)</h3>
+                <p>本システムでは、重量濃度(mg/L)から当量濃度(meq/L)への換算に以下の係数を使用しています。</p>
+                <div style="overflow-x:auto;">
+                    <table class="help-table">
+                        <thead>
+                            <tr>
+                                <th>イオン項目</th>
+                                <th>式量(w)</th>
+                                <th>価数(v)</th>
+                                <th>換算係数 (v/w)</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr><td>Na<sup>+</sup></td><td>22.99</td><td>1</td><td>0.04350</td></tr>
+                            <tr><td>K<sup>+</sup></td><td>39.10</td><td>1</td><td>0.02558</td></tr>
+                            <tr><td>Ca<sup>2+</sup></td><td>40.08</td><td>2</td><td>0.04990</td></tr>
+                            <tr><td>Mg<sup>2+</sup></td><td>24.31</td><td>2</td><td>0.08227</td></tr>
+                            <tr><td>Cl<sup>-</sup></td><td>35.45</td><td>1</td><td>0.02821</td></tr>
+                            <tr><td>HCO<sub>3</sub><sup>-</sup></td><td>61.02</td><td>1</td><td>0.01639</td></tr>
+                            <tr><td>SO<sub>4</sub><sup>2-</sup></td><td>96.06</td><td>2</td><td>0.02082</td></tr>
+                            <tr><td>NO<sub>3</sub>-N (硝酸性窒素)</td><td>14.01</td><td>1</td><td>0.07138</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+                <p style="font-size:11px; color:#666; margin-top:5px;">
+                    ※ 計算式: meq/L = mg/L × 換算係数<br>
+                    ※ NO<sub>3</sub>-Nは窒素の原子量(14.01)に基づき換算しています。
+                </p>
+            </section>
+        </div>
+    </div>
+</div>
+
+<script>
+    const ION = {
+        Na: { w: 22.99, v: 1 }, K:  { w: 39.10, v: 1 },
+        Ca: { w: 40.08, v: 2 }, Mg: { w: 24.31, v: 2 },
+        Cl: { w: 35.45, v: 1 }, HCO3: { w: 61.02, v: 1 },
+        SO4: { w: 96.06, v: 2 }, NO3_N: { w: 14.01, v: 1 }, SiO2: { w: 60.08, v: 0 }
+    };
+    const F = {}; for(let k in ION) F[k] = (ION[k].v > 0) ? ION[k].v / ION[k].w : 0;
+
+    const SIZE = 100;
+    const H = SIZE * Math.sqrt(3) / 2; 
+    const GAP = 25; 
+    const X_ANI_OFFSET = SIZE + GAP; 
+    const PALETTE = [
+        '#e6194b', '#3cb44b', '#4363d8', '#f58231', '#911eb4', 
+        '#46f0f0', '#f032e6', '#bcf60c', '#fabebe', '#008080', 
+        '#e6beff', '#9a6324', '#800000', '#aaffc3', '#808000', 
+        '#ffd8b1', '#000075', '#808080', '#000000'
+    ];
+    
+    let hot, globalData = [];
+    let currentTab = 'piper';
+
+    window.onload = function() {
+        const container = document.getElementById('hot-container');
+        const initData = [
+            [1, '地点A-1', '2023/10/01', 15.2, 7.2, 350, 24.5, 3.2, 45.1, 12.8, 18.5, 120.5, 35.2, 10, 0.5],
+            [1, '地点A-2', '2023/11/01', 14.8, 6.8, 420, 15.0, 2.5, 60.5, 18.2, 22.0, 95.0, 48.0, 12, 1.2],
+            [2, '地点B-1', '2023/10/01', 16.5, 7.5, 280, 85.0, 5.5, 20.2, 8.5, 45.0, 180.0, 12.5, 8, 0.1],
+            [2, '地点B-2', '2023/11/01', 15.0, 7.0, 300, 30.0, 4.0, 35.0, 10.0, 30.0, 110.0, 20.0, 9, 0.3],
+            [3, '地点C',   '2023/10/05', 18.0, 7.1, 250, 15.0, 2.0, 30.0, 9.0, 15.0, 100.0, 15.0, 9, 0.1],
+            [4, null, null, null, null, null, null, null, null, null, null, null, null, null, null]
+        ];
+        
+        hot = new Handsontable(container, {
+            data: initData, minRows: 20, minCols: 15,
+            colHeaders: ['番号','試料名','採水日','水温','pH','EC','Na<sup>+</sup>','K<sup>+</sup>','Ca<sup>2+</sup>','Mg<sup>2+</sup>','Cl<sup>-</sup>','HCO<sub>3</sub><sup>-</sup>','SO<sub>4</sub><sup>2-</sup>','SiO<sub>2</sub>','NO<sub>3</sub>-N'],
+            colWidths: [50, 120, 90, 60, 50, 60, 70, 70, 70, 70, 70, 70, 70, 60, 60],
+            width: '100%', height: '100%', rowHeaders: true, licenseKey: 'non-commercial-and-evaluation', contextMenu: true,
+            columns: [ {}, {}, {}, {type:'numeric'}, {type:'numeric'}, {type:'numeric'}, {type:'numeric'}, {type:'numeric'}, {type:'numeric'}, {type:'numeric'}, {type:'numeric'}, {type:'numeric'}, {type:'numeric'}, {type:'numeric'}, {type:'numeric'} ]
+        });
+        processData();
+    };
+
+    // --- サイドバー開閉用関数 ---
+    function toggleSidebarPanel(contentId, arrowId) {
+        const content = document.getElementById(contentId);
+        const arrow = document.getElementById(arrowId);
+        if (content.style.display === 'none') {
+            content.style.display = 'block';
+            arrow.innerHTML = '▼';
+        } else {
+            content.style.display = 'none';
+            arrow.innerHTML = '▶';
+        }
+    }
+
+    // --- データ入力モーダル制御 ---
+    function openModal() {
+        const unitVal = document.getElementById('input-unit').value;
+        const badge = document.getElementById('modal-unit-badge');
+        if(badge) badge.innerHTML = `現在の入力設定: ${unitVal==='mg'?'mg/L (重量濃度)':'meq/L (当量濃度)'}`;
+        document.getElementById('data-modal').classList.add('show');
+        setTimeout(() => { hot.render(); }, 100);
+    }
+    
+    function closeModal(save) {
+        document.getElementById('data-modal').classList.remove('show');
+        if(save) processData();
+    }
+
+    // --- ヘルプモーダル制御 ---
+    function openHelpModal() {
+        document.getElementById('help-modal').classList.add('show');
+    }
+
+    function closeHelpModal() {
+        document.getElementById('help-modal').classList.remove('show');
+    }
+
+    // モーダルの背景クリックで閉じる処理
+    window.onclick = function(event) {
+        if (event.target.classList.contains('modal-overlay')) {
+            event.target.classList.remove('show');
+        }
+    }
+
+    function processData() {
+        const raw = hot.getData();
+        const res = [];
+        const IDX = { ID: 0, Name: 1, Date: 2, Na: 6, K: 7, Ca: 8, Mg: 9, Cl: 10, HCO3: 11, SO4: 12, NO3_N: 14 };
+        const inputUnit = document.getElementById('input-unit').value;
+
+        raw.forEach((r, i) => {
+            if(r[IDX.Na] === null || r[IDX.Na] === '' || r[IDX.Na] === undefined) return;
+            const v = (c) => { let val = parseFloat(r[c]); return isNaN(val) ? 0 : val; };
+            const rawVal = { Na: v(IDX.Na), K: v(IDX.K), Ca: v(IDX.Ca), Mg: v(IDX.Mg), Cl: v(IDX.Cl), HCO3: v(IDX.HCO3), SO4: v(IDX.SO4), NO3_N: v(IDX.NO3_N) };
+            
+            let meq = {};
+            if (inputUnit === 'mg') {
+                meq = { Na: rawVal.Na * F.Na, K: rawVal.K * F.K, Ca: rawVal.Ca * F.Ca, Mg: rawVal.Mg * F.Mg, Cl: rawVal.Cl * F.Cl, HCO3: rawVal.HCO3 * F.HCO3, SO4: rawVal.SO4 * F.SO4, NO3_N: rawVal.NO3_N * F.NO3_N };
+            } else { meq = { ...rawVal }; }
+            meq.NaK = meq.Na + meq.K;
+            
+            let dStr = r[IDX.Date];
+            if(typeof dStr === 'number' && dStr > 20000) dStr = new Date((dStr - 25569) * 864e5).toLocaleDateString('ja-JP');
+            else if (!dStr) dStr = '';
+            
+            let idVal = r[IDX.ID];
+            if(idVal === null || idVal === '') idVal = (i+1).toString();
+
+            res.push({ sysId: i, userNo: String(idVal), name: r[IDX.Name]||`Sample ${i+1}`, date: dStr, meq: meq, visible: true, baseColor: PALETTE[i % PALETTE.length] });
+        });
+        globalData = res;
+        updateFilters();
+        updateCharts();
+    }
+
+    function assignDisplayColors(data) {
+        const mode = document.getElementById('color-mode').value;
+        const colorMap = {}; let colorIdx = 0;
+        const getGroupColor = (key) => { if(!colorMap[key]) { colorMap[key] = PALETTE[colorIdx % PALETTE.length]; colorIdx++; } return colorMap[key]; };
+        return data.map(d => {
+            let color;
+            if (mode === 'mono') color = '#333333';
+            else if (mode === 'id') color = getGroupColor(d.userNo);
+            else if (mode === 'date') color = getGroupColor(d.date);
+            else color = d.baseColor;
+            return { ...d, displayColor: color };
+        });
+    }
+
+    function updateFilters() {
+        const ids = [...new Set(globalData.map(d => d.userNo))];
+        const names = [...new Set(globalData.map(d => d.name))];
+        const dates = [...new Set(globalData.map(d => d.date))].filter(d=>d);
+        const makeList = (arr, id) => {
+            document.getElementById(id).innerHTML = arr.map(v => `<li class="checkbox-item"><label><input type="checkbox" checked value="${v}" onchange="applyFilters()"> ${v}</label></li>`).join('');
+        };
+        makeList(ids, 'list-ids'); makeList(names, 'list-names');
+        if(dates.length > 0) makeList(dates, 'list-dates');
+    }
+
+    function toggleList(listId, state) {
+        document.querySelectorAll(`#${listId} input`).forEach(input => input.checked = state);
+        applyFilters();
+    }
+
+    function applyFilters() {
+        const selI = Array.from(document.querySelectorAll('#list-ids input:checked')).map(c=>c.value);
+        const selN = Array.from(document.querySelectorAll('#list-names input:checked')).map(c=>c.value);
+        const selD = Array.from(document.querySelectorAll('#list-dates input:checked')).map(c=>c.value);
+        const hasD = document.querySelectorAll('#list-dates input').length > 0;
+        globalData.forEach(d => {
+            d.visible = selI.includes(d.userNo) && selN.includes(d.name) && (!hasD || selD.includes(d.date) || d.date === '');
+        });
+        updateCharts();
+    }
+
+    function updateCharts() {
+        // 修正: 先に全データに対して色を確定させることで、フィルタリングしても色が変わらないようにする
+        const allDataWithColors = assignDisplayColors(globalData);
+        // その後、表示フラグが立っているデータだけを抽出する
+        const data = allDataWithColors.filter(d => d.visible);
+
+        if(currentTab === 'piper') drawPiper(data, document.getElementById('show-lines').checked);
+        else if (currentTab === 'hexa') drawHexa(data, document.getElementById('hexa-uniform-color').checked);
+        else if (currentTab === 'hexa-overlay') drawHexaOverlay(data, document.getElementById('overlay-group-by-id').checked);
+    }
+
+    // --- 共通: 凡例生成関数 ---
+    function renderLegend(data, containerId) {
+        const legendDiv = document.getElementById(containerId);
+        if (!legendDiv) return;
+
+        legendDiv.innerHTML = '<strong>凡例</strong><hr style="margin:5px 0; border:0; border-top:1px solid #ccc;">';
+        
+        const colorMode = document.getElementById('color-mode').value;
+        const legendItems = [];
+        const seenKeys = new Set();
+
+        data.forEach(d => {
+            let key, label, subLabel;
+
+            if (colorMode === 'id') {
+                key = d.userNo; 
+                label = `ID: ${d.userNo}`;
+                subLabel = ''; 
+            } else if (colorMode === 'date') {
+                key = d.date;
+                label = d.date || '日付なし';
+                subLabel = '';
+            } else if (colorMode === 'mono') {
+                key = 'all'; 
+                label = '全データ';
+                subLabel = '';
+            } else {
+                // unique
+                key = d.sysId; 
+                label = `[${d.userNo}] ${d.name}`;
+                subLabel = d.date;
+            }
+
+            if (!seenKeys.has(key)) {
+                seenKeys.add(key);
+                legendItems.push({
+                    color: d.displayColor,
+                    label: label,
+                    subLabel: subLabel
+                });
+            }
+        });
+
+        if (legendItems.length === 0) {
+            legendDiv.innerHTML += '<div style="color:#888;">データなし</div>';
+        } else {
+            legendItems.forEach(item => {
+                const row = document.createElement('div');
+                row.className = 'legend-item';
+                let html = `<span class="color-box" style="background:${item.color}"></span> <span>${item.label}`;
+                if (item.subLabel) {
+                    html += `<br><span style="color:#666; font-size:10px;">${item.subLabel}</span>`;
+                }
+                html += `</span>`;
+                row.innerHTML = html;
+                legendDiv.appendChild(row);
+            });
+        }
+    }
+
+    // --- トリリニアダイヤグラム描画 (修正:サイズ変更対応) ---
+    function drawPiper(data, showLines) {
+        const traces = [];
+        const lineTraces = [];
+        
+        // スライダーからサイズを取得 (デフォルト10)
+        const pSize = parseInt(document.getElementById('piper-marker-size').value) || 10;
+        
+        data.forEach(d => {
+            const m = d.meq;
+            const sumC = m.NaK + m.Ca + m.Mg; const sumA = m.Cl + m.HCO3 + m.SO4;
+            if(sumC===0 || sumA===0) return;
+            const rCa = m.Ca/sumC; const rMg = m.Mg/sumC; const rCl = m.Cl/sumA; const rSO4 = m.SO4/sumA;
+            const cx = SIZE * (1.0 - rCa - rMg*0.5); const cy = SIZE * (Math.sqrt(3)/2 * rMg);
+            const ax = X_ANI_OFFSET + SIZE * (rCl + rSO4 * 0.5); const ay = SIZE * (Math.sqrt(3)/2 * rSO4);
+            const dx = (ax + cx)/2.0 + (ay - cy)/(2.0 * Math.sqrt(3)); const dy = Math.sqrt(3) * (dx - cx) + cy;
+
+            if(showLines) {
+                lineTraces.push({
+                    x: [cx, dx, ax], y: [cy, dy, ay], mode: 'lines', line: { color: d.displayColor, width: 2 },
+                    hoverinfo: 'skip', showlegend: false, opacity: 0.8
+                });
+            }
+            const txt = `<b>[${d.userNo}] ${d.name}</b><br>Ca:${(rCa*100).toFixed(1)}% Mg:${(rMg*100).toFixed(1)}%<br>Cl:${(rCl*100).toFixed(1)}% SO4:${(rSO4*100).toFixed(1)}%`;
+            traces.push({
+                x: [cx, ax, dx], y: [cy, ay, dy], mode: 'markers', 
+                marker: { color: d.displayColor, size: pSize, line: {color:'white', width:1} }, 
+                text: [txt, txt, txt], hoverinfo: 'text', name: d.name, 
+                showlegend: false 
+            });
+        });
+
+        renderLegend(data, 'piper-legend');
+
+        const shapes = []; const annotations = []; 
+        const gridColor = '#ccc'; const outlineColor = '#000'; const tickLen = 5;            
+        const dBx = (SIZE + X_ANI_OFFSET)/2; const dBy = (GAP * Math.sqrt(3))/2;
+        const addLine = (x0, y0, x1, y1, c, w) => shapes.push({type: 'line', x0:x0, y0:y0, x1:x1, y1:y1, line:{color:c, width:w}, layer: 'below'});
+        const addText = (x, y, text, align, angle, size=15, bold=false, color='#000') => {
+            annotations.push({ x: x, y: y, text: text, showarrow: false, font: {family: 'Arial', size: size, color: color, weight: bold?'bold':'normal'}, xanchor: align, yanchor: 'middle', textangle: angle });
+        };
+
+        const pathTriC = `M 0 0 L ${SIZE} 0 L ${SIZE/2} ${H} Z`;
+        const pathTriA = `M ${X_ANI_OFFSET} 0 L ${X_ANI_OFFSET+SIZE} 0 L ${X_ANI_OFFSET+SIZE/2} ${H} Z`;
+        const pathDia = `M ${dBx} ${dBy} L ${dBx-SIZE/2} ${dBy+H} L ${dBx} ${dBy+2*H} L ${dBx+SIZE/2} ${dBy+H} Z`;
+        
+        shapes.push({type:'path', path:pathTriC, line:{color:outlineColor, width:1.5}, layer: 'below'});
+        shapes.push({type:'path', path:pathTriA, line:{color:outlineColor, width:1.5}, layer: 'below'});
+        shapes.push({type:'path', path:pathDia,  line:{color:outlineColor, width:1.5}, layer: 'below'});
+
+        for(let i=0; i<=10; i++) {
+            const p = i/10.0; const val = i*10;     
+            if(i>0 && i<10) {
+                const w_half = (SIZE * (1-p))/2;
+                addLine(SIZE/2 - w_half, H*p, SIZE/2 + w_half, H*p, gridColor, 1);
+                addLine(SIZE*p, 0, SIZE*(1+p)/2, H*(1-p), gridColor, 1);
+                addLine(SIZE*(1-p), 0, SIZE*(1-p)/2, H*(1-p), gridColor, 1);
+                const off = X_ANI_OFFSET;
+                addLine(off + SIZE/2 - w_half, H*p, off + SIZE/2 + w_half, H*p, gridColor, 1);
+                addLine(off + SIZE*p, 0, off + SIZE*(1+p)/2, H*(1-p), gridColor, 1);
+                addLine(off + SIZE*(1-p), 0, off + SIZE*(1-p)/2, H*(1-p), gridColor, 1);
+                const bl_x = dBx - (SIZE/2)*p; const bl_y = dBy + H*p;
+                const tr_x = (dBx + SIZE/2) - (SIZE/2)*p; const tr_y = (dBy + H) + H*p;
+                addLine(bl_x, bl_y, tr_x, tr_y, gridColor, 1);
+                const br_x = dBx + (SIZE/2)*p; const br_y = dBy + H*p;
+                const tl_x = (dBx - SIZE/2) + (SIZE/2)*p; const tl_y = (dBy + H) + H*p;
+                addLine(br_x, br_y, tl_x, tl_y, gridColor, 1);
+            }
+            if(i%2===0) {
+                const tx_ca = SIZE * (1-p); addLine(tx_ca, 0, tx_ca, -tickLen, '#000', 1); addText(tx_ca, -10, val.toString(), 'center', 0);
+                const tx_mg = (SIZE/2)*p; const ty_mg = H*p; addLine(tx_mg, ty_mg, tx_mg-tickLen*0.5, ty_mg+tickLen*0.866, '#000', 1); addText(tx_mg-1, ty_mg+7, val.toString(), 'right', -45); 
+                const tx_na = SIZE/2 + (SIZE/2)*p; const ty_na = H*(1-p); addLine(tx_na, ty_na, tx_na+tickLen*0.5, ty_na+tickLen*0.866, '#000', 1); addText(tx_na+2, ty_na+7, val.toString(), 'left', 45);
+                const off = X_ANI_OFFSET; const tx_cl = off + SIZE*p; addLine(tx_cl, 0, tx_cl, -tickLen, '#000', 1); addText(tx_cl, -10, val.toString(), 'center', 0);
+                const tx_so = off + SIZE - (SIZE/2)*p; const ty_so = H*p; addLine(tx_so, ty_so, tx_so+tickLen*0.5, ty_so+tickLen*0.866, '#000', 1); addText(tx_so+2, ty_so+7, val.toString(), 'left', 45);
+                const tx_hc = off + SIZE/2 - (SIZE/2)*p; const ty_hc = H*(1-p); addLine(tx_hc, ty_hc, tx_hc-tickLen*0.5, ty_hc+tickLen*0.866, '#000', 1); addText(tx_hc-1, ty_hc+7, val.toString(), 'right', -45);
+                const lx = (dBx - SIZE/2) * (1-p) + dBx * p; const ly = (dBy + H) * (1-p) + (dBy + 2*H) * p; addLine(lx, ly, lx-tickLen*0.5, ly+tickLen*0.5*1.732, '#000', 1); addText(lx-2, ly+6, val.toString(), 'right', -60, 15);
+                const rx = (dBx + SIZE/2) * (1-p) + dBx * p; const ry = (dBy + H) * (1-p) + (dBy + 2*H) * p; addLine(rx, ry, rx+tickLen*0.5, ry+tickLen*0.5*1.732, '#000', 1); addText(rx+2, ry+6, val.toString(), 'left', 60, 15);
+            }
+        }
+        
+        const ionGap = 15; 
+        addText(SIZE/2, -ionGap, 'Ca<sup>2+</sup>', 'center', 0, 20, true);
+        addText(-ionGap + 25, H/2 + 5, 'Mg<sup>2+</sup>', 'center', -60, 20, true);
+        addText(SIZE + ionGap - 25, H/2 + 5, 'Na<sup>+</sup>+K<sup>+</sup>', 'center', 60, 20, true);
+        addText(X_ANI_OFFSET + SIZE/2, -ionGap, 'Cl<sup>-</sup>', 'center', 0, 20, true);
+        addText(X_ANI_OFFSET + SIZE + ionGap - 25, H/2 + 5, 'SO<sub>4</sub><sup>2-</sup>', 'center', 60, 20, true);
+        addText(X_ANI_OFFSET - ionGap + 25, H/2 + 5, 'HCO<sub>3</sub><sup>-</sup>', 'center', -60, 20, true);
+        addText(dBx - SIZE/4 - 10, dBy + H/2 + 20, 'Na<sup>+</sup>+K<sup>+</sup>', 'right', 60, 20, true);
+        addText(dBx + SIZE/4 + 10, dBy + H/2 + 20, 'HCO<sub>3</sub><sup>-</sup>', 'left', -60, 20, true);
+        addText(dBx - SIZE/4 + 0, dBy + H*1.5 + 20, 'Cl<sup>-</sup>+SO<sub>4</sub><sup>2-</sup>', 'right', -60, 20, true);
+        addText(dBx + SIZE/4 - 0, dBy + H*1.5 + 20, 'Ca<sup>2+</sup>+Mg<sup>2+</sup>', 'left', 60, 20, true);
+
+        const cy_label = dBy + H;
+        addText(dBx - SIZE/4 -10, cy_label, 'I', 'center', 0, 25, false, '#444'); 
+        addText(dBx, cy_label - H/1.5, 'II', 'center', 0, 25, false, '#444');
+        addText(dBx, cy_label + H/1.5, 'III', 'center', 0, 25, false, '#444');
+        addText(dBx + SIZE/4 +10, cy_label, 'IV', 'center', 0, 25, false, '#444');
+        addText(dBx, cy_label, 'V', 'center', 0, 25, false, '#444'); 
+
+        Plotly.react('piper-plot', [...lineTraces, ...traces], {
+            uirevision: 'true', showlegend: false,
+            margin: {l:40, r:40, t:40, b:40},
+            xaxis: { showgrid:false, zeroline:false, showticklabels:false, autorange: true, fixedrange: false },
+            yaxis: { showgrid:false, zeroline:false, showticklabels:false, autorange: true, scaleanchor:'x', scaleratio:1, fixedrange: false },
+            shapes: shapes, annotations: annotations,
+            hovermode: 'closest', dragmode: 'pan', plot_bgcolor: '#fff', paper_bgcolor: '#fff'
+        }, {responsive:true});
+    }
+
+    // --- 個別ヘキサダイヤグラム ---
+    function drawHexa(data, uniformColor) {
+        const div = document.getElementById('hexa-grid');
+        div.innerHTML = '';
+        
+        renderLegend(data, 'hexa-legend-individual');
+
+        const scaleMode = document.getElementById('hexa-scale-mode').value;
+        const showNO3 = document.getElementById('hexa-show-no3').checked;
+
+        // スライダー値の取得
+        const W = parseInt(document.getElementById('hexa-width').value) || 340;
+        const H = parseInt(document.getElementById('hexa-height').value) || 200;
+        const FSize = parseInt(document.getElementById('hexa-font').value) || 12;
+        
+        div.style.gridTemplateColumns = `repeat(auto-fill, minmax(${W}px, 1fr))`;
+
+        let globalMax = 0;
+        if(scaleMode === 'uniform') {
+            data.forEach(d => { 
+                const m = d.meq; 
+                const valBottom = showNO3 ? (m.SO4 + m.NO3_N) : m.SO4;
+                globalMax = Math.max(globalMax, m.NaK, m.Ca, m.Mg, m.Cl, m.HCO3, valBottom); 
+            });
+        }
+        const globalScaleMax = getNiceScale(globalMax);
+        
+        data.forEach(d => {
+            const m = d.meq;
+            const valSO4 = m.SO4;
+            const valNO3 = showNO3 ? m.NO3_N : 0;
+            const valTotalAnionBottom = valSO4 + valNO3;
+
+            const localMax = Math.max(m.NaK, m.Ca, m.Mg, m.Cl, m.HCO3, valTotalAnionBottom);
+            const scaleMax = (scaleMode === 'uniform') ? globalScaleMax : getNiceScale(localMax);
+            
+            const marginY = 60;
+            const dy = Math.max(20, (H - marginY) / 2);
+            const cy = H / 2 - 10;
+            
+            const labelW = Math.max(60, W * 0.2); 
+            const graphW = W/2 - labelW - 5; const sc = graphW / scaleMax; 
+            const plotColor = uniformColor ? '#0078d4' : d.displayColor;
+
+            const cx = W / 2;
+
+            const ptsBase = [
+                `${cx - m.NaK*sc},${cy - dy}`, `${cx - m.Ca*sc},${cy}`, `${cx - m.Mg*sc},${cy + dy}`, 
+                `${cx + valSO4*sc},${cy + dy}`, 
+                `${cx + m.HCO3*sc},${cy}`, `${cx + m.Cl*sc},${cy - dy}`
+            ].join(' ');
+
+            const ptsNO3 = [
+                `${cx + valSO4*sc},${cy + dy}`,
+                `${cx + valTotalAnionBottom*sc},${cy + dy}`,
+                `${cx + m.HCO3*sc},${cy}`
+            ].join(' ');
+            
+            const makeAxis = () => {
+                const midVal = scaleMax / 2; const midPos = midVal * sc;
+                // 軸の位置はHに基づいて決まるため、Hが増えれば下に移動する
+                let svg = `<line x1="${cx - graphW}" y1="${H-25}" x2="${cx + graphW}" y2="${H-25}" stroke="#333" stroke-width="1"/>`;
+                svg += `<line x1="${cx}" y1="${H-25}" x2="${cx}" y2="${H-20}" stroke="#333" stroke-width="1"/>`; 
+                svg += `<line x1="${cx - graphW}" y1="${H-25}" x2="${cx - graphW}" y2="${H-20}" stroke="#333" stroke-width="1"/>`; 
+                svg += `<line x1="${cx + graphW}" y1="${H-25}" x2="${cx + graphW}" y2="${H-20}" stroke="#333" stroke-width="1"/>`; 
+                svg += `<line x1="${cx - midPos}" y1="${H-25}" x2="${cx - midPos}" y2="${H-20}" stroke="#666" stroke-width="1"/>`;
+                svg += `<line x1="${cx + midPos}" y1="${H-25}" x2="${cx + midPos}" y2="${H-20}" stroke="#666" stroke-width="1"/>`;
+                svg += `<line x1="${cx - midPos}" y1="20" x2="${cx - midPos}" y2="${H-25}" stroke="#eee" stroke-dasharray="2,2"/>`;
+                svg += `<line x1="${cx + midPos}" y1="20" x2="${cx + midPos}" y2="${H-25}" stroke="#eee" stroke-dasharray="2,2"/>`;
+                svg += `<text x="${cx}" y="${H-8}" font-size="${Math.max(9, FSize-2)}" text-anchor="middle">0</text>`;
+                svg += `<text x="${cx - graphW}" y="${H-8}" font-size="${Math.max(9, FSize-2)}" text-anchor="middle">${scaleMax}</text>`;
+                svg += `<text x="${cx + graphW}" y="${H-8}" font-size="${Math.max(9, FSize-2)}" text-anchor="middle">${scaleMax}</text>`;
+                svg += `<text x="${cx - midPos}" y="${H-8}" font-size="${Math.max(8, FSize-3)}" text-anchor="middle" fill="#666">${midVal}</text>`;
+                svg += `<text x="${cx + midPos}" y="${H-8}" font-size="${Math.max(8, FSize-3)}" text-anchor="middle" fill="#666">${midVal}</text>`;
+                svg += `<text x="${cx}" y="${H}" font-size="${Math.max(9, FSize-2)}" text-anchor="middle" fill="#666">meq/L</text>`;
+                return svg;
+            };
+
+            const subF = Math.max(8, FSize - 3);
+            let labelSO4 = `SO<tspan dy="3" font-size="${subF}">4</tspan><tspan dy="-7" font-size="${subF}">2-</tspan>`;
+            if (showNO3) {
+                labelSO4 += `+NO<tspan dy="3" font-size="${subF}">3</tspan><tspan dy="-7" font-size="${subF}">-</tspan>`;
+            }
+
+            const svg = `<svg width="${W}" height="${H}">
+                <line x1="${cx}" y1="20" x2="${cx}" y2="${H-25}" stroke="#ccc" stroke-dasharray="2,2"/>
+                <line x1="${cx - graphW}" y1="${cy-dy}" x2="${cx + graphW}" y2="${cy-dy}" stroke="#eee" />
+                <line x1="${cx - graphW}" y1="${cy}" x2="${cx + graphW}" y2="${cy}" stroke="#eee" />
+                <line x1="${cx - graphW}" y1="${cy+dy}" x2="${cx + graphW}" y2="${cy+dy}" stroke="#eee" />
+                
+                <text x="${labelW}" y="${cy-dy}" text-anchor="end" font-size="${FSize}" fill="#333" dy="4" font-weight="bold">Na<tspan dy="-4" font-size="${subF}">+</tspan>+K<tspan dy="-4" font-size="${subF}">+</tspan></text>
+                <text x="${W-labelW}" y="${cy-dy}" text-anchor="start" font-size="${FSize}" fill="#333" dy="4" font-weight="bold">Cl<tspan dy="-4" font-size="${subF}">-</tspan></text>
+                
+                <text x="${labelW}" y="${cy}" text-anchor="end" font-size="${FSize}" fill="#333" dy="4" font-weight="bold">Ca<tspan dy="-4" font-size="${subF}">2+</tspan></text>
+                <text x="${W-labelW}" y="${cy}" text-anchor="start" font-size="${FSize}" fill="#333" dy="4" font-weight="bold">HCO<tspan dy="3" font-size="${subF}">3</tspan><tspan dy="-7" font-size="${subF}">-</tspan></text>
+                
+                <text x="${labelW}" y="${cy+dy}" text-anchor="end" font-size="${FSize}" fill="#333" dy="4" font-weight="bold">Mg<tspan dy="-4" font-size="${subF}">2+</tspan></text>
+                <text x="${W-labelW}" y="${cy+dy}" text-anchor="start" font-size="${FSize}" fill="#333" dy="4" font-weight="bold">${labelSO4}</text>
+                
+                ${ (showNO3 && valNO3 > 0.01) ? `<polygon points="${ptsNO3}" fill="#888" stroke="none" fill-opacity="0.6" />` : '' }
+                <polygon points="${ptsBase}" fill="${plotColor}" fill-opacity="0.2" stroke="${plotColor}" stroke-width="2" />
+                
+                <circle cx="${cx - m.NaK*sc}" cy="${cy - dy}" r="2" fill="${plotColor}" />
+                <circle cx="${cx - m.Ca*sc}" cy="${cy}" r="2" fill="${plotColor}" />
+                <circle cx="${cx - m.Mg*sc}" cy="${cy + dy}" r="2" fill="${plotColor}" />
+                <circle cx="${cx + valSO4*sc}" cy="${cy + dy}" r="2" fill="${plotColor}" />
+                ${ (showNO3 && valNO3 > 0.01) ? `<circle cx="${cx + valTotalAnionBottom*sc}" cy="${cy + dy}" r="2" fill="#555" />` : '' }
+                <circle cx="${cx + m.HCO3*sc}" cy="${cy}" r="2" fill="${plotColor}" />
+                <circle cx="${cx + m.Cl*sc}" cy="${cy - dy}" r="2" fill="${plotColor}" />
+                
+                ${makeAxis()}
+            </svg>`;
+            
+            const card = document.createElement('div'); card.className='hexa-card'; 
+            card.innerHTML = `<div class="hexa-meta">[${d.userNo}] ${d.name}<br><span style="font-weight:normal; font-size:11px;">${d.date}</span></div>${svg}`;
+            div.appendChild(card);
+        });
+    }
+
+    // --- 重ね合わせ用SVG生成 ---
+    function generateHexaSvg(dataset, maxVal, width, height, fontSize) {
+        const showNO3 = document.getElementById('overlay-show-no3').checked;
+        const scaleMax = getNiceScale(maxVal);
+        const midVal = scaleMax / 2;
+        
+        const W = width || 600; 
+        const H = height || 550;
+        const F = fontSize || 14;
+        const subF = Math.max(9, F - 4);
+        
+        const marginY = 80;
+        const dy = Math.max(30, (H - marginY) / 2);
+        const cx = W/2, cy = H/2 - 10;
+        
+        const labelW = Math.max(80, W * 0.15);
+        const graphW = W/2 - labelW - 10, sc = graphW / scaleMax;
+        const midPos = midVal * sc;
+
+        let labelSO4 = `SO<tspan dy="3" font-size="${subF}">4</tspan><tspan dy="-7" font-size="${subF}">2-</tspan>`;
+        if(showNO3) {
+            labelSO4 += `+NO<tspan dy="3" font-size="${subF}">3</tspan><tspan dy="-7" font-size="${subF}">-</tspan>`;
+        }
+
+        let svgContent = `
+            <line x1="${cx}" y1="30" x2="${cx}" y2="${H-50}" stroke="#999" stroke-width="2" />
+            <line x1="${cx - graphW}" y1="${cy-dy}" x2="${cx + graphW}" y2="${cy-dy}" stroke="#ddd" />
+            <line x1="${cx - graphW}" y1="${cy}" x2="${cx + graphW}" y2="${cy}" stroke="#ddd" />
+            <line x1="${cx - graphW}" y1="${cy+dy}" x2="${cx + graphW}" y2="${cy+dy}" stroke="#ddd" />
+            
+            <text x="${labelW}" y="${cy-dy}" text-anchor="end" font-size="${F}" fill="#333" dy="6" font-weight="bold">Na<tspan dy="-4" font-size="${subF}">+</tspan>+K<tspan dy="-4" font-size="${subF}">+</tspan></text>
+            <text x="${W-labelW}" y="${cy-dy}" text-anchor="start" font-size="${F}" fill="#333" dy="6" font-weight="bold">Cl<tspan dy="-4" font-size="${subF}">-</tspan></text>
+            
+            <text x="${labelW}" y="${cy}" text-anchor="end" font-size="${F}" fill="#333" dy="6" font-weight="bold">Ca<tspan dy="-4" font-size="${subF}">2+</tspan></text>
+            <text x="${W-labelW}" y="${cy}" text-anchor="start" font-size="${F}" fill="#333" dy="6" font-weight="bold">HCO<tspan dy="3" font-size="${subF}">3</tspan><tspan dy="-7" font-size="${subF}">-</tspan></text>
+            
+            <text x="${labelW}" y="${cy+dy}" text-anchor="end" font-size="${F}" fill="#333" dy="6" font-weight="bold">Mg<tspan dy="-4" font-size="${subF}">2+</tspan></text>
+            <text x="${W-labelW}" y="${cy+dy}" text-anchor="start" font-size="${F}" fill="#333" dy="6" font-weight="bold">${labelSO4}</text>
+            
+            <line x1="${cx - graphW}" y1="${H-40}" x2="${cx + graphW}" y2="${H-40}" stroke="#333" stroke-width="1.5"/>
+            <line x1="${cx}" y1="${H-40}" x2="${cx}" y2="${H-35}" stroke="#333" stroke-width="1.5"/>
+            <line x1="${cx - graphW}" y1="${H-40}" x2="${cx - graphW}" y2="${H-35}" stroke="#333" stroke-width="1.5"/>
+            <line x1="${cx + graphW}" y1="${H-40}" x2="${cx + graphW}" y2="${H-35}" stroke="#333" stroke-width="1.5"/>
+            
+            <line x1="${cx - midPos}" y1="${H-40}" x2="${cx - midPos}" y2="${H-35}" stroke="#666" stroke-width="1"/>
+            <line x1="${cx + midPos}" y1="${H-40}" x2="${cx + midPos}" y2="${H-35}" stroke="#666" stroke-width="1"/>
+            <line x1="${cx - midPos}" y1="30" x2="${cx - midPos}" y2="${H-40}" stroke="#eee" stroke-dasharray="4,4"/>
+            <line x1="${cx + midPos}" y1="30" x2="${cx + midPos}" y2="${H-40}" stroke="#eee" stroke-dasharray="4,4"/>
+
+            <text x="${cx}" y="${H-20}" font-size="${F}" text-anchor="middle">0</text>
+            <text x="${cx - graphW}" y="${H-20}" font-size="${F}" text-anchor="middle">${scaleMax}</text>
+            <text x="${cx + graphW}" y="${H-20}" font-size="${F}" text-anchor="middle">${scaleMax}</text>
+            <text x="${cx - midPos}" y="${H-20}" font-size="${Math.max(9, F-2)}" text-anchor="middle" fill="#666">${midVal}</text>
+            <text x="${cx + midPos}" y="${H-20}" font-size="${Math.max(9, F-2)}" text-anchor="middle" fill="#666">${midVal}</text>
+            <text x="${cx}" y="${H-5}" font-size="${Math.max(9, F-2)}" text-anchor="middle" fill="#666">meq/L</text>
+        `;
+        
+        dataset.forEach(d => {
+            const m = d.meq; 
+            const valSO4 = m.SO4;
+            const valNO3 = showNO3 ? m.NO3_N : 0;
+            const valTotal = valSO4 + valNO3;
+
+            const ptsBase = [`${cx - m.NaK*sc},${cy - dy}`, `${cx - m.Ca*sc},${cy}`, `${cx - m.Mg*sc},${cy + dy}`, `${cx + valSO4*sc},${cy + dy}`, `${cx + m.HCO3*sc},${cy}`, `${cx + m.Cl*sc},${cy - dy}`].join(' ');
+            
+            if (showNO3 && valNO3 > 0.01) {
+                const ptsNO3 = [
+                    `${cx + valSO4*sc},${cy + dy}`,
+                    `${cx + valTotal*sc},${cy + dy}`,
+                    `${cx + m.HCO3*sc},${cy}`
+                ].join(' ');
+                svgContent += `<polygon points="${ptsNO3}" fill="#888" stroke="none" fill-opacity="0.3" />`;
+            }
+
+            svgContent += `<polygon points="${ptsBase}" fill="none" stroke="${d.displayColor}" stroke-width="2" /><circle cx="${cx - m.NaK*sc}" cy="${cy - dy}" r="3" fill="${d.displayColor}" />`;
+            
+            if (showNO3 && valNO3 > 0.01) {
+                 svgContent += `<circle cx="${cx + valTotal*sc}" cy="${cy + dy}" r="2" fill="#555" opacity="0.5" />`;
+            }
+        });
+        
+        return `<svg width="${W}" height="${H}" viewBox="0 0 ${W} ${H}" preserveAspectRatio="xMidYMid meet">${svgContent}</svg>`;
+    }
+
+    function drawHexaOverlay(data, isGridMode) {
+        const chartContainer = document.getElementById('hexa-chart-container');
+        
+        renderLegend(data, 'hexa-legend');
+
+        if(data.length === 0) { 
+            chartContainer.innerHTML = '<div style="display:flex; justify-content:center; align-items:center; height:100%; color:#888;">データが選択されていません</div>';
+            return; 
+        }
+        
+        chartContainer.innerHTML = '';
+        if(isGridMode) {
+            const gridDiv = document.createElement('div'); gridDiv.id = 'hexa-overlay-grid'; chartContainer.appendChild(gridDiv);
+            drawHexaOverlayGrid(data, gridDiv);
+        } else {
+            const singleDiv = document.createElement('div'); singleDiv.id = 'hexa-overlay-single'; chartContainer.appendChild(singleDiv);
+            drawHexaOverlaySingle(data, singleDiv);
+        }
+    }
+
+    function drawHexaOverlaySingle(data, container) {
+        const showNO3 = document.getElementById('overlay-show-no3').checked;
+        let max = 0; 
+        data.forEach(d => { 
+            const m = d.meq; 
+            const valBottom = showNO3 ? (m.SO4 + m.NO3_N) : m.SO4;
+            max = Math.max(max, m.NaK, m.Ca, m.Mg, m.Cl, m.HCO3, valBottom); 
+        });
+        
+        // スライダーの値を適用
+        const W = parseInt(document.getElementById('hexa-width').value) || 340;
+        const H = parseInt(document.getElementById('hexa-height').value) || 200;
+        const FSize = parseInt(document.getElementById('hexa-font').value) || 12;
+        
+        container.innerHTML = generateHexaSvg(data, max, W, H, FSize);
+    }
+
+    function drawHexaOverlayGrid(data, container) {
+        container.innerHTML = ''; 
+        if(data.length === 0) return;
+        const showNO3 = document.getElementById('overlay-show-no3').checked;
+        
+        const W = parseInt(document.getElementById('hexa-width').value) || 340;
+        const H = parseInt(document.getElementById('hexa-height').value) || 200;
+        const FSize = parseInt(document.getElementById('hexa-font').value) || 12;
+        container.style.gridTemplateColumns = `repeat(auto-fill, minmax(${W}px, 1fr))`;
+
+        const groups = {}; let maxVal = 0; 
+        data.forEach(d => { 
+            if(!groups[d.userNo]) groups[d.userNo] = []; groups[d.userNo].push(d); 
+            const m = d.meq; 
+            const valBottom = showNO3 ? (m.SO4 + m.NO3_N) : m.SO4;
+            maxVal = Math.max(maxVal, m.NaK, m.Ca, m.Mg, m.Cl, m.HCO3, valBottom); 
+        });
+        Object.keys(groups).sort().forEach(id => {
+            const groupData = groups[id]; const card = document.createElement('div'); card.className = 'hexa-card';
+            card.innerHTML = `<div class="hexa-meta">ID: ${id} (n=${groupData.length})</div>` + generateHexaSvg(groupData, maxVal, W, H, FSize);
+            container.appendChild(card);
+        });
+    }
+
+    function getNiceScale(val) {
+        if(val <= 0) return 1; const mag = Math.pow(10, Math.floor(Math.log10(val))); const norm = val / mag; let nice;
+        if(norm <= 1) nice = 1; else if(norm <= 2) nice = 2; else if(norm <= 5) nice = 5; else nice = 10; return nice * mag;
+    }
+
+    function switchTab(t, el) {
+        currentTab = t; 
+        document.querySelectorAll('.tab').forEach(e => e.classList.remove('active')); 
+        document.querySelectorAll('.chart-view').forEach(e => e.classList.remove('active')); 
+        document.querySelectorAll('.chart-controls').forEach(e => e.style.display = 'none');
+        
+        el.classList.add('active'); 
+        document.getElementById(`view-${t}`).classList.add('active');
+        
+        if(t === 'piper') {
+            document.getElementById('control-piper').style.display = 'block';
+            Plotly.Plots.resize('piper-plot');
+        }
+        if(t === 'hexa') {
+            document.getElementById('control-hexa').style.display = 'block';
+            document.getElementById('control-hexa-size').style.display = 'block'; 
+        }
+        if(t === 'hexa-overlay') {
+            document.getElementById('control-overlay').style.display = 'block';
+            document.getElementById('control-hexa-size').style.display = 'block'; 
+        }
+        updateCharts();
+    }
+
+    function saveData() {
+        const rawData = hot.getData();
+        const saveObj = {
+            data: rawData,
+            settings: {
+                colorMode: document.getElementById('color-mode').value,
+                inputUnit: document.getElementById('input-unit').value,
+                showLines: document.getElementById('show-lines').checked,
+                hexaUniform: document.getElementById('hexa-uniform-color').checked,
+                hexaShowNO3: document.getElementById('hexa-show-no3').checked,
+                overlayShowNO3: document.getElementById('overlay-show-no3').checked,
+                hexaScale: document.getElementById('hexa-scale-mode').value,
+                overlayGroup: document.getElementById('overlay-group-by-id').checked
+            }
+        };
+        const blob = new Blob([JSON.stringify(saveObj, null, 2)], {type: "application/json"});
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        const dateStr = new Date().toISOString().slice(0,10).replace(/-/g, '');
+        a.href = url; a.download = `water_analysis_${dateStr}.json`;
+        document.body.appendChild(a); a.click(); document.body.removeChild(a); URL.revokeObjectURL(url);
+    }
+
+    function loadDataFile(input) {
+        const file = input.files[0];
+        if (!file) return;
+        const reader = new FileReader();
+        reader.onload = function(e) {
+            try {
+                const json = JSON.parse(e.target.result);
+                let loadData = [];
+                if (Array.isArray(json)) { loadData = json; } else if (json.data) {
+                    loadData = json.data;
+                    if(json.settings) {
+                        if(json.settings.colorMode) document.getElementById('color-mode').value = json.settings.colorMode;
+                        if(json.settings.inputUnit) document.getElementById('input-unit').value = json.settings.inputUnit;
+                        if(json.settings.showLines !== undefined) document.getElementById('show-lines').checked = json.settings.showLines;
+                        if(json.settings.hexaUniform !== undefined) document.getElementById('hexa-uniform-color').checked = json.settings.hexaUniform;
+                        if(json.settings.hexaShowNO3 !== undefined) document.getElementById('hexa-show-no3').checked = json.settings.hexaShowNO3;
+                        if(json.settings.overlayShowNO3 !== undefined) {
+                            document.getElementById('overlay-show-no3').checked = json.settings.overlayShowNO3;
+                        } else if (json.settings.hexaShowNO3 !== undefined) {
+                            document.getElementById('overlay-show-no3').checked = false;
+                        }
+                        if(json.settings.hexaScale) document.getElementById('hexa-scale-mode').value = json.settings.hexaScale;
+                        if(json.settings.overlayGroup !== undefined) document.getElementById('overlay-group-by-id').checked = json.settings.overlayGroup;
+                    }
+                } else { alert("無効なデータ形式です"); return; }
+                hot.loadData(loadData); processData(); alert("データを読み込みました (" + loadData.length + "件)");
+            } catch (err) { alert("読み込みエラー: " + err); }
+        };
+        reader.readAsText(file); input.value = '';
+    }
+</script>
+</body>
+</html>

@@ -1,0 +1,1106 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>圧密試験結果整理システム (200件対応版)</title>
+ <link rel="icon" href='data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>📉</text></svg>'>
+<script src="https://cdn.tailwindcss.com"></script>
+<!-- Chart.js 3.9.1 stable -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/3.9.1/chart.min.js"></script>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/handsontable@6.2.2/dist/handsontable.full.min.css">
+<script src="https://cdn.jsdelivr.net/npm/handsontable@6.2.2/dist/handsontable.full.min.js"></script>
+
+<style>
+    body { font-family: 'Segoe UI', Arial, sans-serif; overflow: hidden; }
+    ::-webkit-scrollbar { width: 8px; height: 8px; }
+    ::-webkit-scrollbar-track { background: #1f2937; }
+    ::-webkit-scrollbar-thumb { background: #4b5563; border-radius: 4px; }
+    
+    .sidebar-scroll::-webkit-scrollbar-track { background: #111827; }
+
+    .chart-header { background-color: #34495e; color: white; border-top-left-radius: 0.5rem; border-top-right-radius: 0.5rem; }
+    .symbol-text { color: #f1c40f; font-family: 'Times New Roman', serif; font-style: italic; }
+
+    .handsontable th { background-color: #f3f4f6; color: #374151; font-weight: bold; font-size: 0.75rem; vertical-align: middle; text-align: center; }
+    
+    .tab-active { border-bottom: 3px solid #2563eb; color: #2563eb; font-weight: bold; background-color: #eff6ff; }
+    .tab-inactive { color: #6b7280; border-bottom: 3px solid transparent; }
+    .tab-inactive:hover { color: #374151; border-bottom: 3px solid #d1d5db; }
+
+    #contextMenu {
+        position: absolute; z-index: 1000; background: white; border: 1px solid #ccc;
+        border-radius: 4px; box-shadow: 2px 2px 5px rgba(0,0,0,0.2); padding: 5px 0; min-width: 150px;
+    }
+    #contextMenu div { padding: 8px 15px; cursor: pointer; font-size: 14px; color: #333; }
+    #contextMenu div:hover { background-color: #f3f4f6; color: #2563eb; }
+
+    /* トグルスイッチ用スタイル */
+    .toggle-checkbox:checked {
+        right: 0;
+        border-color: #68D391;
+    }
+    .toggle-checkbox:checked + .toggle-label {
+        background-color: #68D391;
+    }
+</style>
+</head>
+<body class="bg-gray-100 text-gray-800 h-screen flex">
+
+<!-- サイドバー -->
+<aside class="w-72 bg-slate-900 text-white flex flex-col h-full shadow-xl flex-shrink-0 z-20">
+    <!-- ヘッダー（ヘルプボタン追加） -->
+    <div class="p-4 border-b border-slate-700 bg-slate-900 flex justify-between items-start">
+        <div>
+            <h1 class="text-xl font-bold text-blue-400 tracking-wide"><i class="fas fa-chart-line mr-2"></i>圧密試験整理システム</h1>
+        </div>
+        <button onclick="openHelpModal()" class="text-slate-400 hover:text-white transition-colors mt-1" title="使い方ガイド">
+            <i class="fas fa-question-circle fa-lg"></i>
+        </button>
+    </div>
+
+    <div class="flex-1 overflow-y-auto sidebar-scroll p-4 space-y-6">
+        <div class="bg-slate-800 p-3 rounded-lg border border-slate-700">
+            <h2 class="text-xs uppercase text-slate-400 font-bold mb-2"><i class="fas fa-database mr-2"></i> データ入出力</h2>
+            <div class="grid grid-cols-2 gap-2">
+                <button onclick="saveData()" class="bg-green-600 hover:bg-green-700 text-white py-1 px-2 rounded text-sm transition"><i class="fas fa-save mr-1"></i>保存</button>
+                <label class="bg-orange-600 hover:bg-orange-700 text-white py-1 px-2 rounded text-sm transition text-center cursor-pointer"><i class="fas fa-folder-open mr-1"></i>読込
+                    <input type="file" id="fileInput" class="hidden" onchange="loadData(this)">
+                </label>
+            </div>
+            <button onclick="openBatchModal()" class="w-full mt-2 bg-blue-600 hover:bg-blue-700 text-white py-1 px-2 rounded text-sm transition">
+                <i class="fas fa-table mr-1"></i> Excel一括登録
+            </button>
+            <button onclick="openDataListModal()" class="w-full mt-2 bg-slate-600 hover:bg-slate-500 text-white py-1 px-2 rounded text-sm transition border border-slate-500">
+                <i class="fas fa-list mr-1"></i> 登録データ一覧・編集
+            </button>
+        </div>
+
+        <div class="bg-slate-800 p-3 rounded-lg border border-slate-700">
+            <h2 class="text-xs uppercase text-slate-400 font-bold mb-2"><i class="fas fa-sliders-h mr-2"></i> グラフ表示設定</h2>
+            <div class="mb-4">
+                <label class="text-xs text-slate-400 block mb-1">グラフの高さ</label>
+                <input type="range" min="200" max="800" value="350" step="10" id="heightSlider" oninput="updateChartHeight(this.value)" class="w-full h-2 bg-slate-600 rounded-lg appearance-none cursor-pointer">
+                <div class="text-right text-xs text-slate-400 mt-1" id="heightValue">350px</div>
+            </div>
+            <div>
+                <label class="text-xs text-slate-400 block mb-1">マーカーサイズ</label>
+                <input type="range" min="1" max="10" value="4" step="1" id="pointSizeSlider" oninput="updatePointSize(this.value)" class="w-full h-2 bg-slate-600 rounded-lg appearance-none cursor-pointer">
+                <div class="text-right text-xs text-slate-400 mt-1" id="pointSizeValue">4px</div>
+            </div>
+            
+            <!-- テーブル表示トグル -->
+            <div class="mt-4 pt-4 border-t border-slate-700">
+                <label class="flex items-center cursor-pointer justify-between">
+                    <span class="text-xs font-bold text-slate-300">代表曲線データ表を表示</span>
+                    <div class="relative">
+                        <input type="checkbox" id="toggleTableSwitch" class="sr-only peer" onchange="toggleTableMode(this.checked)">
+                        <div class="w-10 h-5 bg-slate-600 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-blue-600"></div>
+                    </div>
+                </label>
+            </div>
+        </div>
+
+        <div>
+            <h2 class="text-sm font-bold text-slate-300 mb-2 border-l-4 border-blue-500 pl-2">表示設定</h2>
+            <div class="bg-slate-800 rounded p-2">
+                <label class="text-xs text-slate-400 block mb-1">グルーピング基準</label>
+                <select id="groupSelect" onchange="refreshView()" class="w-full bg-slate-700 border border-slate-600 text-white text-sm rounded p-1">
+                    <option value="layer">地層ごと (Ac2, Ac3...)</option>
+                    <option value="hole">孔番ごと (No.1, No.2...)</option>
+                </select>
+            </div>
+        </div>
+        <div>
+            <div class="flex justify-between items-center mb-2 border-l-4 border-blue-500 pl-2">
+                <h2 class="text-sm font-bold text-slate-300">孔番フィルタ</h2>
+                <div class="text-xs space-x-1"><button onclick="toggleAllFilters('hole', true)" class="text-blue-400">全</button><span class="text-slate-600">|</span><button onclick="toggleAllFilters('hole', false)" class="text-slate-400">解</button></div>
+            </div>
+            <div id="holeFilterList" class="bg-slate-800 rounded p-2 space-y-1 max-h-40 overflow-y-auto text-sm"></div>
+        </div>
+        <div>
+            <div class="flex justify-between items-center mb-2 border-l-4 border-pink-500 pl-2">
+                <h2 class="text-sm font-bold text-slate-300">土層フィルタ</h2>
+                <div class="text-xs space-x-1"><button onclick="toggleAllFilters('layer', true)" class="text-blue-400">全</button><span class="text-slate-600">|</span><button onclick="toggleAllFilters('layer', false)" class="text-slate-400">解</button></div>
+            </div>
+            <div id="layerFilterList" class="bg-slate-800 rounded p-2 space-y-1 max-h-40 overflow-y-auto text-sm"></div>
+        </div>
+    </div>
+</aside>
+
+<!-- メインコンテンツ -->
+<main class="flex-1 h-full overflow-y-auto bg-gray-200 relative" id="mainContent">
+    <div class="p-6 pb-20">
+        <div id="chartsContainer" class="space-y-8">
+            <div class="text-center text-gray-500 mt-20"><p class="text-xl">読み込み中...</p></div>
+        </div>
+
+<!-- ▼▼▼ 免責事項・フッターここから ▼▼▼ -->
+<footer style="font-size: 12px; text-align: center; padding: 20px; color: #6c757d; background-color: #f3f4f6; border-top: 1px solid #d1d5db; margin-top: 50px;">
+    <div style="display: flex; justify-content: center; align-items: center; gap: 20px; flex-wrap: wrap; margin-bottom: 10px;">
+        <p id="lastUpdated" style="margin: 0; font-weight: 500; color: #4b5563;"></p>
+        <button id="legal-toggle" style="background: none; border: none; cursor: pointer; font-weight: bold; color: #2563eb; text-decoration: underline; padding: 5px;">
+            免責事項 (クリックで表示)
+        </button>
+    </div>
+
+    <div id="legal-details" style="display: none; margin-top: 15px; border-top: 1px solid #e5e7eb; padding-top: 15px; text-align: left; max-width: 800px; margin-left: auto; margin-right: auto; line-height: 1.6;">
+        <p style="text-align: center; font-weight: bold; margin-bottom: 5px; color: #1f2937;">
+            Copyright &copy; 2025 (株)地圏総合コンサルタント All Rights Reserved.
+        </p>
+        <p style="font-size: 11px; color: #6b7280; text-align: center; margin-bottom: 15px;">
+            Developed by: Naoya.Onozato
+        </p>
+        
+        <div style="background-color: #fff7ed; border: 1px solid #fdba74; color: #c2410c; padding: 10px; border-radius: 6px; margin-bottom: 15px; font-weight: bold; text-align: center;">
+            ⚠ 本システムの再配布・ソースコードの無断転用を禁止します。
+        </div>
+
+        <div style="font-size: 11px; color: #4b5563;">
+            <p style="margin-bottom: 10px;">
+                <strong>【免責事項】</strong><br>
+                本システムは圧密試験結果（e-logP, Cv, mv）の整理および作図作業を支援するツールです。<br>
+                出力されるグラフ、代表曲線の設定、および各種読み取り値については、<strong>必ず土質基礎等の専門知識を有する技術者が、供試体の乱れや試験条件等を考慮した上で妥当性を確認・判断してください。</strong><br>
+                本システムの利用により生じたいかなる計算誤りや損害についても、開発者および著作権者は一切の責任を負いません。
+            </p>
+            <p style="margin-bottom: 0;">
+                <strong>【使用ライブラリ】</strong><br>
+                Chart.js, Handsontable, Tailwind CSS, FontAwesome
+            </p>
+        </div>
+    </div>
+</footer>
+
+<script>
+    // フッター機能の初期化
+    (function() {
+        // 最終更新日の設定
+        const lastUpdatedEl = document.getElementById('lastUpdated');
+        if (lastUpdatedEl) { 
+            // 必要に応じて日付を変更してください
+            lastUpdatedEl.textContent = `最終更新日: 2025年11月25日`; 
+        }
+
+        // 免責事項の表示切替
+        const legalToggle = document.getElementById('legal-toggle');
+        const legalDetails = document.getElementById('legal-details');
+        
+        if (legalToggle && legalDetails) {
+            legalToggle.addEventListener('click', function() {
+                const isHidden = legalDetails.style.display === 'none';
+                legalDetails.style.display = isHidden ? 'block' : 'none';
+                legalToggle.textContent = isHidden ? '免責事項 (クリックで非表示)' : '免責事項 (クリックで表示)';
+                
+                // 表示時に一番下までスクロール
+                if (isHidden) {
+                    setTimeout(() => {
+                        // メインコンテンツエリアをスクロールさせる
+                        const mainContent = document.getElementById('mainContent');
+                        if(mainContent) {
+                            mainContent.scrollTo({ top: mainContent.scrollHeight, behavior: 'smooth' });
+                        } else {
+                            legalDetails.scrollIntoView({ behavior: 'smooth', block: 'end' });
+                        }
+                    }, 100);
+                }
+            });
+        }
+    })();
+</script>
+<!-- ▲▲▲ 免責事項・フッターここまで ▲▲▲ -->
+
+    </div>
+</main>
+
+<!-- コンテキストメニュー -->
+<div id="contextMenu" class="hidden">
+    <div onclick="setRepresentativeCurve()">★ 代表曲線に設定する</div>
+    <div onclick="removeRepresentativeCurve()" class="text-red-500">× 設定を解除する</div>
+</div>
+
+<!-- 軸設定モーダル -->
+<div id="axisSettingsModal" class="fixed inset-0 bg-black bg-opacity-50 hidden z-50 flex items-center justify-center">
+    <div class="bg-white w-full max-w-md rounded-lg shadow-2xl p-6">
+        <h2 class="text-xl font-bold text-gray-800 mb-4">グラフ設定 (個別)</h2>
+        <div class="text-xs text-gray-500 mb-4" id="axisModalTitle">対象: </div>
+        <div class="space-y-4">
+            <div class="bg-gray-50 p-3 rounded border">
+                <h3 class="font-bold text-sm text-gray-700 mb-2">横軸 (X-Axis)</h3>
+                <div class="grid grid-cols-3 gap-2">
+                    <div><label class="text-xs text-gray-400">Min</label><input type="number" step="any" id="axisXMin" class="w-full border rounded p-1 text-sm" oninput="previewAxisSettings()"></div>
+                    <div><label class="text-xs text-gray-400">Max</label><input type="number" step="any" id="axisXMax" class="w-full border rounded p-1 text-sm" oninput="previewAxisSettings()"></div>
+                    <div><label class="text-xs text-gray-400">Step</label><input type="number" step="any" id="axisXStep" class="w-full border rounded p-1 text-sm" oninput="previewAxisSettings()"></div>
+                </div>
+            </div>
+            <div class="bg-gray-50 p-3 rounded border">
+                <h3 class="font-bold text-sm text-gray-700 mb-2">縦軸 (Y-Axis)</h3>
+                <div class="grid grid-cols-3 gap-2">
+                    <div><label class="text-xs text-gray-400">Min</label><input type="number" step="any" id="axisYMin" class="w-full border rounded p-1 text-sm" oninput="previewAxisSettings()"></div>
+                    <div><label class="text-xs text-gray-400">Max</label><input type="number" step="any" id="axisYMax" class="w-full border rounded p-1 text-sm" oninput="previewAxisSettings()"></div>
+                    <div><label class="text-xs text-gray-400">Step</label><input type="number" step="any" id="axisYStep" class="w-full border rounded p-1 text-sm" oninput="previewAxisSettings()"></div>
+                </div>
+            </div>
+        </div>
+        <div class="mt-6 flex justify-end space-x-3">
+            <button onclick="resetAxisSettings()" class="px-4 py-2 text-red-600 border border-red-200 rounded hover:bg-red-50 text-sm">初期化</button>
+            <div class="flex-1"></div>
+            <button onclick="cancelAxisSettings()" class="px-4 py-2 bg-gray-200 rounded hover:bg-gray-300">キャンセル</button>
+            <button onclick="applyAxisSettings()" class="px-4 py-2 text-white bg-blue-600 rounded hover:bg-blue-700">適用(確定)</button>
+        </div>
+    </div>
+</div>
+
+<!-- 一括登録用モーダル -->
+<div id="batchModal" class="fixed inset-0 bg-black bg-opacity-50 hidden z-50 flex items-center justify-center">
+    <div class="bg-white w-full max-w-7xl h-[95vh] rounded-lg shadow-2xl flex flex-col overflow-hidden relative">
+        <div class="flex-shrink-0 flex justify-between items-center p-4 border-b bg-gray-50 z-20">
+            <div>
+                <h2 class="text-xl font-bold text-gray-800"><i class="fas fa-file-excel text-green-600 mr-2"></i>Excelデータ一括登録</h2>
+                <p class="text-xs text-gray-500 mt-1">ヘッダー行は含めずにデータのみコピーしてください。</p>
+            </div>
+            <button onclick="closeBatchModal()" class="text-gray-500 hover:text-red-500 p-2"><i class="fas fa-times fa-lg"></i></button>
+        </div>
+        <div class="flex-1 flex flex-col p-4 space-y-4 overflow-hidden bg-white">
+            <div class="flex-shrink-0 h-48 flex flex-col">
+                <h3 class="flex-shrink-0 font-bold text-sm text-gray-700 mb-2 border-l-4 border-blue-600 pl-2">1. 試料一覧データ (左側の表)</h3>
+                <div class="flex-1 border border-gray-300 relative">
+                    <div id="hotMeta" class="absolute inset-0 overflow-hidden"></div>
+                </div>
+            </div>
+            <div class="flex-1 flex flex-col min-h-0">
+                <h3 class="flex-shrink-0 font-bold text-sm text-gray-700 mb-2 border-l-4 border-green-600 pl-2">2. 試験結果データ (右側の表)</h3>
+                <div class="flex-shrink-0 flex border-b border-gray-200">
+                    <button onclick="switchTab('ep')" id="tab-ep" class="tab-active py-2 px-6 text-sm font-medium transition-colors border-r">① e-logP</button>
+                    <button onclick="switchTab('cv')" id="tab-cv" class="tab-inactive py-2 px-6 text-sm font-medium transition-colors border-r">② Cv</button>
+                    <button onclick="switchTab('mv')" id="tab-mv" class="tab-inactive py-2 px-6 text-sm font-medium transition-colors border-r">③ mv</button>
+                </div>
+                <div class="flex-1 border border-t-0 border-gray-300 relative bg-gray-50">
+                    <div id="pane-ep" class="absolute inset-0 p-0 block"><div id="hotEp" class="w-full h-full overflow-hidden"></div></div>
+                    <div id="pane-cv" class="absolute inset-0 p-0 hidden"><div id="hotCv" class="w-full h-full overflow-hidden"></div></div>
+                    <div id="pane-mv" class="absolute inset-0 p-0 hidden"><div id="hotMv" class="w-full h-full overflow-hidden"></div></div>
+                </div>
+            </div>
+        </div>
+        <div class="flex-shrink-0 p-4 border-t bg-gray-50 flex justify-end space-x-3 z-20">
+            <button onclick="clearAllGrids()" class="px-4 py-2 text-red-600 hover:bg-red-50 rounded text-sm"><i class="fas fa-trash mr-1"></i> 全てクリア</button>
+            <div class="flex-1"></div>
+            <button onclick="closeBatchModal()" class="px-4 py-2 text-gray-600 bg-gray-200 rounded hover:bg-gray-300">キャンセル</button>
+            <button onclick="registerBatchData()" class="px-6 py-2 text-white bg-blue-600 rounded hover:bg-blue-700 font-bold shadow"><i class="fas fa-check mr-1"></i> データ登録</button>
+        </div>
+    </div>
+</div>
+
+<!-- データ管理モーダル -->
+<div id="dataListModal" class="fixed inset-0 bg-black bg-opacity-50 hidden z-50 flex items-center justify-center">
+    <div class="bg-white w-full max-w-5xl h-[90vh] rounded-lg shadow-2xl flex flex-col overflow-hidden">
+        <div class="flex-shrink-0 p-4 border-b bg-gray-50 flex justify-between items-center">
+            <h2 class="text-xl font-bold text-gray-800"><i class="fas fa-tasks text-slate-600 mr-2"></i>登録データ管理</h2>
+            <button onclick="closeDataListModal()" class="text-gray-500 hover:text-red-500"><i class="fas fa-times fa-lg"></i></button>
+        </div>
+        <div id="dataListView" class="flex-1 overflow-y-auto p-4">
+            <table class="min-w-full bg-white border border-gray-300">
+                <thead class="bg-gray-100 text-gray-700 text-sm sticky top-0 shadow">
+                    <tr>
+                        <th class="py-2 px-4 border text-left">孔番 (Hole)</th>
+                        <th class="py-2 px-4 border text-left">試料名 (Sample)</th>
+                        <th class="py-2 px-4 border text-left">深度 (Depth)</th>
+                        <th class="py-2 px-4 border text-left">土層 (Layer)</th>
+                        <th class="py-2 px-4 border text-center">データ数</th>
+                        <th class="py-2 px-4 border text-center w-32">操作</th>
+                    </tr>
+                </thead>
+                <tbody id="dataListTableBody" class="text-sm text-gray-600"></tbody>
+            </table>
+        </div>
+        <div id="dataEditView" class="hidden flex-1 flex flex-col p-4 bg-gray-50 overflow-y-auto">
+            <div class="flex space-x-4 mb-4 border-b pb-4">
+                <div class="w-1/4"><label class="block text-xs font-bold text-gray-700 mb-1">孔番</label><input type="text" id="editHole" class="w-full border rounded p-2"></div>
+                <div class="w-1/4"><label class="block text-xs font-bold text-gray-700 mb-1">試料名</label><input type="text" id="editSample" class="w-full border rounded p-2"></div>
+                <div class="w-1/4"><label class="block text-xs font-bold text-gray-700 mb-1">深度</label><input type="text" id="editDepth" class="w-full border rounded p-2"></div>
+                <div class="w-1/4"><label class="block text-xs font-bold text-gray-700 mb-1">土層名</label><input type="text" id="editLayer" class="w-full border rounded p-2"></div>
+            </div>
+            <div class="flex-1 grid grid-cols-3 gap-4 min-h-0">
+                <div class="flex flex-col h-full"><label class="text-xs font-bold text-red-600 mb-1">e-logP データ (P, e)</label><textarea id="editEpData" class="flex-1 w-full border p-2 font-mono text-xs resize-none focus:ring-2 focus:ring-red-200"></textarea></div>
+                <div class="flex flex-col h-full"><label class="text-xs font-bold text-blue-600 mb-1">Cv データ (P_avg, Cv)</label><textarea id="editCvData" class="flex-1 w-full border p-2 font-mono text-xs resize-none focus:ring-2 focus:ring-blue-200"></textarea></div>
+                <div class="flex flex-col h-full"><label class="text-xs font-bold text-green-600 mb-1">mv データ (P_avg, mv)</label><textarea id="editMvData" class="flex-1 w-full border p-2 font-mono text-xs resize-none focus:ring-2 focus:ring-green-200"></textarea></div>
+            </div>
+        </div>
+        <div class="flex-shrink-0 p-4 border-t bg-gray-100 flex justify-end space-x-2">
+            <button id="btnBackToList" onclick="showListView()" class="hidden px-4 py-2 bg-gray-300 hover:bg-gray-400 text-gray-800 rounded">一覧に戻る</button>
+            <button id="btnSaveEdit" onclick="saveEditedData()" class="hidden px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded font-bold">保存する</button>
+            <button id="btnCloseList" onclick="closeDataListModal()" class="px-4 py-2 bg-gray-300 hover:bg-gray-400 text-gray-800 rounded">閉じる</button>
+        </div>
+    </div>
+</div>
+
+<!-- ヘルプモーダル (新規追加) -->
+<div id="helpModal" class="fixed inset-0 bg-black bg-opacity-50 hidden z-50 flex items-center justify-center">
+    <div class="bg-white w-full max-w-2xl h-[80vh] rounded-lg shadow-2xl flex flex-col overflow-hidden relative">
+        <!-- ヘッダー -->
+        <div class="flex-shrink-0 flex justify-between items-center p-4 border-b bg-gray-50">
+            <h2 class="text-xl font-bold text-gray-800"><i class="fas fa-book-open text-blue-600 mr-2"></i>使い方ガイド</h2>
+            <button onclick="closeHelpModal()" class="text-gray-500 hover:text-red-500 p-2"><i class="fas fa-times fa-lg"></i></button>
+        </div>
+        
+        <!-- コンテンツ -->
+        <div class="flex-1 overflow-y-auto p-6 text-sm text-gray-700 space-y-6 leading-relaxed">
+            
+            <section>
+                <h3 class="font-bold text-base text-gray-900 border-l-4 border-blue-500 pl-2 mb-2">1. データの登録方法</h3>
+                <ul class="list-disc pl-5 space-y-1">
+                    <li><span class="font-bold">Excel一括登録:</span> 「Excel一括登録」ボタンから、試料情報と試験結果（e-logP, Cv, mv）をまとめて貼り付けて登録できます。</li>
+                    <li><span class="font-bold">JSON読込:</span> 以前に保存した <code>.json</code> ファイルを読み込んで復元します。</li>
+                </ul>
+            </section>
+
+            <section>
+                <h3 class="font-bold text-base text-gray-900 border-l-4 border-green-500 pl-2 mb-2">2. グラフの操作・代表曲線の決定</h3>
+                <p class="mb-2">グラフ上のプロット点を操作して、設計採用値（代表曲線）を設定できます。</p>
+                <div class="bg-gray-100 p-3 rounded border border-gray-200">
+                    <ul class="list-disc pl-5 space-y-1">
+                        <li><span class="font-bold text-blue-600">代表曲線の設定:</span> プロット点を <span class="font-bold">右クリック</span> し、「★ 代表曲線に設定する」を選択します。</li>
+                        <li><span class="font-bold text-blue-600">吹き出しの移動:</span> 代表曲線の吹き出し（コメントボックス）は、マウスで<span class="font-bold">ドラッグして好きな位置に移動</span>できます。</li>
+                        <li><span class="font-bold text-red-500">解除:</span> 解除したい点を右クリックし、「× 設定を解除する」を選択します。</li>
+                    </ul>
+                </div>
+                <p class="mt-2 text-xs text-gray-500">※ 代表曲線に設定されたデータは、太線で強調表示され、グラフ横の表に数値が出力されます。</p>
+            </section>
+
+            <section>
+                <h3 class="font-bold text-base text-gray-900 border-l-4 border-purple-500 pl-2 mb-2">3. 表示の調整</h3>
+                <ul class="list-disc pl-5 space-y-1">
+                    <li><span class="font-bold">軸スケールの変更:</span> 各グラフ右上の <i class="fas fa-cog text-gray-400"></i> アイコンをクリックすると、X軸・Y軸の最大・最小値を個別に固定できます。</li>
+                    <li><span class="font-bold">フィルタリング:</span> 左サイドバーの下部で、特定の「孔番」や「土層」のみを表示・非表示に切り替えられます。</li>
+                    <li><span class="font-bold">グラフサイズ:</span> スライダーでグラフの高さやプロットの大きさを調整できます。</li>
+                </ul>
+            </section>
+            
+            <section>
+                <h3 class="font-bold text-base text-gray-900 border-l-4 border-orange-500 pl-2 mb-2">4. データの保存</h3>
+                <p>「保存」ボタンを押すと、現在のデータ、代表曲線の設定、グラフの軸設定を含めたすべての状態をJSONファイルとしてダウンロードします。</p>
+            </section>
+
+        </div>
+        
+        <!-- フッター -->
+        <div class="flex-shrink-0 p-4 border-t bg-gray-50 flex justify-end">
+            <button onclick="closeHelpModal()" class="px-6 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded font-bold transition">閉じる</button>
+        </div>
+    </div>
+</div>
+
+<script>
+    let globalData = [];
+    let filterState = { holes: new Set(), layers: new Set() };
+    let chartInstances = [];
+    let currentPointSize = 4;
+    let specificAxisSettings = {}; 
+    
+    // 代表曲線の設定: { datasetIndex, text, x, y } (x,yは任意)
+    let representativeSettings = {};
+    let ctxMenuTarget = { chart: null, datasetIndex: null };
+
+    // テーブル表示モード管理
+    let isTableMode = false;
+
+    // ドラッグ用変数
+    let draggingLabel = null; 
+
+    // バックアップ用変数
+    let tempSettingsBackup = null;
+    let currentEditingId = null;
+
+    const chartColors = ['#ef4444', '#3b82f6', '#10b981', '#f59e0b', '#8b5cf6', '#ec4899', '#06b6d4', '#6366f1', '#84cc16', '#14b8a6'];
+    const holeColors = { '額田-No.1': '#ef4444', '額田-No.2': '#3b82f6', '額田-No.3': '#10b981', '額田-No.4': '#f59e0b', '額田-No.5': '#8b5cf6' };
+    
+    let hotMeta, hotEp, hotCv, hotMv;
+
+    window.onload = function() {
+        addSampleDataInternal();
+        initFilters();
+        refreshView();
+        document.addEventListener('click', (e) => {
+            document.getElementById('contextMenu').classList.add('hidden');
+        });
+
+        // ヘルプモーダルの背景クリックで閉じる処理
+        document.getElementById('helpModal').addEventListener('click', function(e) {
+            if (e.target === this) {
+                closeHelpModal();
+            }
+        });
+    };
+
+    function addSampleDataInternal() {
+         globalData = [
+            { id: 1, hole: '額田-No.1', sample: 'S-1', layer: 'Ac2', depth: 'GL-5m', ep: [{x:10,y:2.6}, {x:20,y:2.58}, {x:50,y:2.5}, {x:100,y:2.4}, {x:200,y:2.2}, {x:400,y:1.8}, {x:800,y:1.4}], cv: [{x:10,y:1800}, {x:20,y:1500}, {x:50,y:1200}, {x:100,y:800}, {x:200,y:400}, {x:400,y:200}, {x:800,y:100}], mv: [{x:10,y:0.002}, {x:20,y:0.0015}, {x:50,y:0.001}, {x:100,y:0.0008}, {x:200,y:0.0006}, {x:400,y:0.0004}] },
+            { id: 2, hole: '額田-No.1', sample: 'S-2', layer: 'Ac2', depth: 'GL-7m', ep: [{x:10,y:2.3}, {x:20,y:2.25}, {x:50,y:2.1}, {x:100,y:1.9}, {x:200,y:1.7}, {x:400,y:1.4}, {x:800,y:1.1}], cv: [{x:10,y:1600}, {x:20,y:1300}, {x:50,y:1000}, {x:100,y:600}, {x:200,y:300}, {x:400,y:150}, {x:800,y:80}], mv: [{x:10,y:0.0018}, {x:20,y:0.0013}, {x:50,y:0.0009}, {x:100,y:0.0007}, {x:200,y:0.0005}, {x:400,y:0.0003}] }
+        ];
+    }
+
+    // ヘルプモーダル関数
+    function openHelpModal() { document.getElementById('helpModal').classList.remove('hidden'); }
+    function closeHelpModal() { document.getElementById('helpModal').classList.add('hidden'); }
+
+    // ▼▼▼ 200件対応修正箇所ここから ▼▼▼
+    function initGrids() {
+        if (hotMeta) return;
+
+        // 最大登録数を200に設定
+        const MAX_SAMPLES = 200; 
+
+        hotMeta = new Handsontable(document.getElementById('hotMeta'), { 
+            data: Array.from({ length: MAX_SAMPLES }, () => [null, null, null, null, null]), 
+            colHeaders: ['地点名', '試料名', '深度(m)', '土質名', '土層番号(任意)'], 
+            columns: [{type:'text'}, {type:'text'}, {type:'text'}, {type:'text'}, {type:'text'}], 
+            colWidths: [120, 100, 80, 80, 80], 
+            rowHeaders: true, 
+            stretchH: 'all', 
+            contextMenu: true, 
+            manualColumnResize: true, 
+            licenseKey: 'non-commercial-and-evaluation' 
+        });
+
+        const createResultSettings = (xLabel, yLabel) => {
+            let cols = [], headers = [];
+            // ループを200回に設定
+            for(let i=1; i<=MAX_SAMPLES; i++) { 
+                headers.push(`${xLabel}<br><span style="font-size:0.7em;color:#666">No.${i}</span>`); 
+                headers.push(`${yLabel}<br><span style="font-size:0.7em;color:#666">No.${i}</span>`); 
+                cols.push({type: 'numeric', numericFormat: {pattern: '0,0.00'}}); 
+                cols.push({type: 'numeric', numericFormat: {pattern: '0.0000'}}); 
+            }
+            return { headers, cols };
+        };
+        const epSet = createResultSettings('P', 'e'), cvSet = createResultSettings('P_avg', 'Cv'), mvSet = createResultSettings('P_avg', 'mv');
+        
+        // 列数を200試料×2列=400列に設定
+        const commonOpts = { 
+            data: Handsontable.helper.createSpreadsheetData(50, MAX_SAMPLES * 2), 
+            rowHeaders: true, 
+            colWidths: 60, 
+            manualColumnResize: true, 
+            contextMenu: true, 
+            licenseKey: 'non-commercial-and-evaluation' 
+        };
+
+        hotEp = new Handsontable(document.getElementById('hotEp'), { ...commonOpts, colHeaders: epSet.headers, columns: epSet.cols });
+        hotCv = new Handsontable(document.getElementById('hotCv'), { ...commonOpts, colHeaders: cvSet.headers, columns: cvSet.cols });
+        hotMv = new Handsontable(document.getElementById('hotMv'), { ...commonOpts, colHeaders: mvSet.headers, columns: mvSet.cols });
+        
+        clearAllGrids();
+    }
+
+    function openBatchModal() { const m = document.getElementById('batchModal'); m.classList.remove('hidden'); requestAnimationFrame(() => { initGrids(); [hotMeta, hotEp, hotCv, hotMv].forEach(h => h && h.render()); }); }
+    function closeBatchModal() { document.getElementById('batchModal').classList.add('hidden'); }
+    function switchTab(t) { ['ep', 'cv', 'mv'].forEach(x => { document.getElementById(`tab-${x}`).className = x===t ? 'tab-active py-2 px-6 text-sm font-medium border-r' : 'tab-inactive py-2 px-6 text-sm font-medium border-r'; document.getElementById(`pane-${x}`).className = x===t ? 'absolute inset-0 p-0 block' : 'absolute inset-0 p-0 hidden'; }); if(t==='ep') hotEp.render(); if(t==='cv') hotCv.render(); if(t==='mv') hotMv.render(); }
+    
+    function clearAllGrids() { 
+        const MAX_SAMPLES = 200;
+        hotMeta.loadData(Handsontable.helper.createSpreadsheetData(MAX_SAMPLES, 5).map(r => r.map(() => null))); 
+        const e = Handsontable.helper.createSpreadsheetData(50, MAX_SAMPLES * 2).map(r => r.map(() => null)); 
+        hotEp.loadData(JSON.parse(JSON.stringify(e))); 
+        hotCv.loadData(JSON.parse(JSON.stringify(e))); 
+        hotMv.loadData(JSON.parse(JSON.stringify(e))); 
+    }
+    // ▲▲▲ 200件対応修正箇所ここまで ▲▲▲
+    
+    function registerBatchData() {
+        const meta = hotMeta.getData(), ep = hotEp.getData(), cv = hotCv.getData(), mv = hotMv.getData();
+        let c = 0;
+        for(let r=0; r<meta.length; r++) {
+            const h = meta[r][0], s = meta[r][1], l = meta[r][3]; if(!h) continue; 
+            const ext = (g) => { const arr=[]; for(let i=0; i<g.length; i++) { const x=parseFloat(g[i][r*2]), y=parseFloat(g[i][r*2+1]); if(!isNaN(x)&&x>0&&!isNaN(y)) arr.push({x,y}); } return arr; };
+            const eD = ext(ep), cD = ext(cv), mD = ext(mv);
+            if(eD.length||cD.length||mD.length) { 
+                globalData.push({ id: Date.now()+r, hole: h, sample: s||'', layer: l||'Unknown', depth: meta[r][2]?`GL-${meta[r][2]}m`:(meta[r][1]||''), ep:eD, cv:cD, mv:mD }); 
+                c++; 
+            }
+        }
+        if(c>0) { alert(`${c}件登録`); closeBatchModal(); initFilters(); refreshView(); clearAllGrids(); } else alert('データなし');
+    }
+
+    function initFilters() {
+        const h = [...new Set(globalData.map(d => d.hole))].sort(), l = [...new Set(globalData.map(d => d.layer))].sort();
+        filterState.holes = new Set(h); filterState.layers = new Set(l);
+        renderFilterList('hole', h, filterState.holes); renderFilterList('layer', l, filterState.layers);
+    }
+    function renderFilterList(type, items, selectedSet) {
+        const c = document.getElementById(type + 'FilterList'); c.innerHTML = '';
+        items.forEach(i => {
+            const div = document.createElement('div'); div.className = "flex items-center";
+            const dot = type === 'hole' ? `<span class="w-3 h-3 rounded-full mr-2 inline-block" style="background:${getColorByHash(i)}"></span>` : '';
+            div.innerHTML = `<label class="flex items-center cursor-pointer w-full hover:bg-slate-700 p-1 rounded"><input type="checkbox" class="form-checkbox text-blue-500 rounded bg-slate-900 border-slate-600" value="${i}" ${selectedSet.has(i) ? 'checked' : ''} onchange="updateFilter('${type}', '${i}', this.checked)"><span class="ml-2 text-slate-200">${dot}${i}</span></label>`;
+            c.appendChild(div);
+        });
+    }
+    function getColorByHash(str) { if(holeColors[str]) return holeColors[str]; let h = 0; for(let i=0; i<str.length; i++) h = str.charCodeAt(i) + ((h<<5)-h); const c = (h & 0x00FFFFFF).toString(16).toUpperCase(); return '#'+("00000".substring(0,6-c.length)+c); }
+    function updateFilter(t, v, c) { (c ? filterState[t+'s'].add(v) : filterState[t+'s'].delete(v)); refreshView(); }
+    function toggleAllFilters(t, all) { const s = filterState[t+'s']; s.clear(); if(all) (t==='hole'?[...new Set(globalData.map(d=>d.hole))]:[...new Set(globalData.map(d=>d.layer))]).forEach(i=>s.add(i)); renderFilterList(t, t==='hole'?[...new Set(globalData.map(d=>d.hole))]:[...new Set(globalData.map(d=>d.layer))], s); refreshView(); }
+
+    function updateChartHeight(val) {
+        document.getElementById('heightValue').innerText = val + 'px';
+        const grids = document.querySelectorAll('.chart-grid');
+        grids.forEach(g => g.style.height = val + 'px');
+        chartInstances.forEach(chart => chart.resize());
+    }
+
+    function updatePointSize(val) {
+        currentPointSize = parseInt(val);
+        document.getElementById('pointSizeValue').innerText = val + 'px';
+        chartInstances.forEach(chart => {
+            refreshView(); 
+        });
+    }
+
+    function toggleTableMode(checked) {
+        isTableMode = checked;
+        refreshView();
+    }
+
+    function updateTableVisibility(chartId) {
+        const tableId = chartId.replace('chart-', 'table-');
+        const tableDiv = document.getElementById(tableId);
+        if (!tableDiv) return;
+
+        const repSetting = representativeSettings[chartId];
+        
+        if (isTableMode && repSetting) {
+            tableDiv.classList.remove('hidden');
+            renderTableContent(chartId, repSetting.datasetIndex);
+            const chart = Chart.getChart(chartId);
+            if (chart) chart.resize();
+        } else {
+            tableDiv.classList.add('hidden');
+            const chart = Chart.getChart(chartId);
+            if (chart) chart.resize();
+        }
+    }
+
+    function renderTableContent(chartId, datasetIndex) {
+        const tableId = chartId.replace('chart-', 'table-');
+        const chart = Chart.getChart(chartId);
+        if (!chart) return;
+        const dataset = chart.data.datasets[datasetIndex];
+        if (!dataset) return;
+
+        const headerDiv = document.getElementById(tableId + '-header');
+        headerDiv.innerHTML = `<span class="text-[10px] block text-gray-600 font-normal">採用曲線</span>${dataset.label.split('(')[0]}`;
+
+        const tbody = document.getElementById(tableId + '-body');
+        tbody.innerHTML = '';
+        dataset.data.forEach(point => {
+            const tr = document.createElement('tr');
+            tr.className = "hover:bg-yellow-50 transition-colors border-b border-gray-600";
+            
+            let xVal = point.x, yVal = point.y;
+            const xStr = xVal >= 100 ? xVal.toFixed(0) : xVal.toFixed(1);
+            let yStr = yVal;
+            if (chartId.includes('ep')) yStr = yVal.toFixed(3);
+            else if (chartId.includes('cv')) yStr = yVal.toFixed(1);
+            else if (chartId.includes('mv')) yStr = yVal.toExponential(2);
+            
+            tr.innerHTML = `<td class="p-1 pr-2 border-r border-gray-600 font-mono text-black">${xStr}</td><td class="p-1 pr-2 font-mono font-bold text-black">${yStr}</td>`;
+            tbody.appendChild(tr);
+        });
+    }
+
+    function refreshView() {
+        const container = document.getElementById('chartsContainer'); container.innerHTML = ''; 
+        chartInstances.forEach(c => c.destroy()); chartInstances = [];
+        const groupMode = document.getElementById('groupSelect').value;
+        const filtered = globalData.filter(d => filterState.holes.has(d.hole) && filterState.layers.has(d.layer));
+        if (filtered.length === 0) { container.innerHTML = '<div class="text-center text-gray-500 mt-10">データなし</div>'; return; }
+        
+        const groups = {};
+        filtered.forEach(d => { const k = groupMode === 'layer' ? d.layer : d.hole; if(!groups[k]) groups[k]=[]; groups[k].push(d); });
+        
+        const currentHeight = document.getElementById('heightSlider').value;
+
+        Object.keys(groups).sort().forEach(key => {
+            const section = document.createElement('div'); section.className = "bg-white rounded-lg shadow p-4 border-l-8 border-blue-600";
+            section.innerHTML = `<h3 class="text-2xl font-bold text-white bg-blue-900 inline-block px-4 py-1 rounded mb-4">${key}</h3>`;
+            
+            const grid = document.createElement('div'); 
+            grid.className = "grid grid-cols-1 md:grid-cols-3 gap-4 chart-grid";
+            grid.style.height = currentHeight + 'px';
+
+            grid.appendChild(createChartCard(key, 'ep', '間隙比', 'e'));
+            grid.appendChild(createChartCard(key, 'cv', '圧密係数', 'Cv'));
+            grid.appendChild(createChartCard(key, 'mv', '体積圧縮係数', 'mv'));
+            
+            section.appendChild(grid); container.appendChild(section);
+            drawChart(key, 'ep', groups[key], false); 
+            drawChart(key, 'cv', groups[key], true); 
+            drawChart(key, 'mv', groups[key], true); 
+        });
+    }
+
+    function createChartCard(groupKey, type, title, symbol) {
+        const div = document.createElement('div'); 
+        div.className = "relative border border-gray-400 rounded-lg flex flex-col h-full bg-white overflow-hidden shadow-sm"; 
+        const canvasId = `chart-${groupKey}-${type}`.replace(/\s/g, '');
+        const tableId = `table-${groupKey}-${type}`.replace(/\s/g, '');
+        div.innerHTML = `
+            <div class="chart-header p-2 flex flex-col items-center justify-center relative h-14 flex-shrink-0 z-10">
+                <span class="text-sm font-bold tracking-wider">${title}</span>
+                <span class="symbol-text text-lg leading-none">${symbol}</span>
+                <button onclick="openAxisSettings('${groupKey}', '${type}')" class="absolute top-2 right-2 text-slate-400 hover:text-white transition-colors">
+                    <i class="fas fa-cog"></i>
+                </button>
+            </div>
+            <div class="flex-1 min-h-0 relative flex flex-row">
+                <div class="flex-1 relative min-w-0">
+                    <div class="absolute inset-2"><canvas id="${canvasId}"></canvas></div>
+                </div>
+                <div id="${tableId}" class="hidden w-48 border-l border-gray-600 bg-white flex flex-col text-xs transition-all duration-300">
+                    <div class="p-2 bg-yellow-100 border-b border-gray-600 font-bold text-center text-gray-800" id="${tableId}-header">採用曲線</div>
+                    <div class="flex-1 overflow-y-auto">
+                        <table class="w-full text-right border-collapse">
+                            <thead class="bg-gray-100 text-gray-800 sticky top-0 shadow-sm">
+                                <tr>
+                                    <th class="p-1 border-b border-r border-gray-600 text-center w-1/2">P<br>(kN/m²)</th>
+                                    <th class="p-1 border-b border-gray-600 text-center w-1/2">${symbol}</th>
+                                </tr>
+                            </thead>
+                            <tbody id="${tableId}-body" class="bg-white text-gray-900"></tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>`;
+        return div;
+    }
+
+    const generateLogTicks = (min, max) => {
+        const ticks = [];
+        if (!min || !max) return [];
+        const minPow = Math.floor(Math.log10(min));
+        const maxPow = Math.ceil(Math.log10(max));
+        for (let i = minPow; i <= maxPow; i++) {
+            for (let j = 1; j <= 9; j++) {
+                const val = j * Math.pow(10, i);
+                const cleanVal = parseFloat(val.toPrecision(10));
+                if (cleanVal >= min * 0.99 && cleanVal <= max * 1.01) { ticks.push(cleanVal); }
+            }
+        }
+        return ticks;
+    };
+
+    function drawChart(groupKey, type, dataList, isLogY) {
+        const canvasId = `chart-${groupKey}-${type}`.replace(/\s/g, '');
+        const canvas = document.getElementById(canvasId);
+        const ctx = canvas.getContext('2d');
+        const settings = specificAxisSettings[`${groupKey}-${type}`] || { xMin: null, xMax: null, xStep: null, yMin: null, yMax: null, yStep: null };
+        
+        const repSetting = representativeSettings[canvasId];
+        const hasRep = !!repSetting;
+
+        // Y軸ラベルとX軸ラベルの設定
+        let yAxisLabel = "";
+        let xAxisLabel = "平均圧密圧力 P̄ (kN/m²)"; // デフォルト
+
+        if (type === 'ep') {
+            yAxisLabel = "間隙比 e";
+            xAxisLabel = "圧密圧力 P (kN/m²)"; // e-logPの場合のみPに変更
+        } else if (type === 'cv') {
+            yAxisLabel = "圧密係数 Cv (cm²/d)";
+        } else if (type === 'mv') {
+            yAxisLabel = "体積圧縮係数 mv (m²/kN)";
+        }
+
+        // コンテキストメニュー用イベント
+        canvas.addEventListener('contextmenu', function(e) {
+            e.preventDefault();
+            const chart = Chart.getChart(canvasId);
+            const points = chart.getElementsAtEventForMode(e, 'nearest', { intersect: true }, true);
+            if (points.length > 0) {
+                const datasetIndex = points[0].datasetIndex;
+                ctxMenuTarget = { chart: chart, datasetIndex: datasetIndex, type: type };
+                const menu = document.getElementById('contextMenu');
+                menu.style.left = e.pageX + 'px';
+                menu.style.top = e.pageY + 'px';
+                menu.classList.remove('hidden');
+            }
+        });
+
+        // ★ ドラッグ処理の追加 ★
+        canvas.addEventListener('mousedown', function(e) {
+            const chart = Chart.getChart(canvasId);
+            if (!chart || !chart.repBox) return;
+            
+            const rect = canvas.getBoundingClientRect();
+            const mouseX = e.clientX - rect.left;
+            const mouseY = e.clientY - rect.top;
+            
+            // 当たり判定
+            const box = chart.repBox;
+            if (mouseX >= box.x && mouseX <= box.x + box.w && 
+                mouseY >= box.y && mouseY <= box.y + box.h) {
+                draggingLabel = {
+                    chartId: canvasId,
+                    offsetX: mouseX - box.x,
+                    offsetY: mouseY - box.y
+                };
+                canvas.style.cursor = 'grabbing';
+            }
+        });
+
+        canvas.addEventListener('mousemove', function(e) {
+            const chart = Chart.getChart(canvasId);
+            if (!chart) return;
+
+            const rect = canvas.getBoundingClientRect();
+            const mouseX = e.clientX - rect.left;
+            const mouseY = e.clientY - rect.top;
+
+            // ドラッグ中
+            if (draggingLabel && draggingLabel.chartId === canvasId) {
+                // 座標更新
+                representativeSettings[canvasId].x = mouseX - draggingLabel.offsetX;
+                representativeSettings[canvasId].y = mouseY - draggingLabel.offsetY;
+                chart.update('none'); // アニメーションなしで再描画
+                return;
+            }
+
+            // ホバー判定（カーソル変更）
+            if (chart.repBox) {
+                const box = chart.repBox;
+                if (mouseX >= box.x && mouseX <= box.x + box.w && 
+                    mouseY >= box.y && mouseY <= box.y + box.h) {
+                    canvas.style.cursor = 'grab';
+                } else {
+                    canvas.style.cursor = 'default';
+                }
+            }
+        });
+
+        canvas.addEventListener('mouseup', function() {
+            if (draggingLabel) {
+                draggingLabel = null;
+                canvas.style.cursor = 'grab';
+            }
+        });
+
+        canvas.addEventListener('mouseout', function() {
+            if (draggingLabel) {
+                draggingLabel = null;
+                canvas.style.cursor = 'default';
+            }
+        });
+
+        const datasets = dataList.map((d, i) => {
+            const baseColor = chartColors[i % chartColors.length];
+            let borderWidth = 1.5;
+            let pointRadius = currentPointSize;
+            let order = 1;
+
+            const labelText = d.sample ? `${d.hole} [${d.sample}] (${d.depth})` : `${d.hole} (${d.depth})`;
+
+            if (hasRep && repSetting.datasetIndex === i) {
+                borderWidth = 4;
+                pointRadius = currentPointSize + 2;
+                order = 0; 
+            } else {
+                borderWidth = 1.5;
+                pointRadius = currentPointSize;
+                order = 10;
+            }
+
+            return {
+                label: labelText,
+                data: d[type],
+                borderColor: baseColor, backgroundColor: baseColor,
+                originalColor: baseColor, 
+                pointRadius: pointRadius, pointHoverRadius: pointRadius + 2, borderWidth: borderWidth,
+                fill: false, showLine: true, tension: 0, order: order
+            };
+        });
+
+        // ★ 代表曲線プラグイン ★
+        const repCurvePlugin = { id: 'repCurvePlugin', afterDatasetsDraw(chart, args, options) { 
+            const ctx = chart.ctx; const chartId = chart.canvas.id; const setting = representativeSettings[chartId];
+            if (setting && chart.data.datasets[setting.datasetIndex]) {
+                const meta = chart.getDatasetMeta(setting.datasetIndex); if(meta.hidden) return; 
+                const points = meta.data; const midIndex = Math.floor(points.length / 2); const point = points[midIndex];
+                if (point) {
+                    const x = point.x, y = point.y;
+                    ctx.font = 'bold 12px Arial'; const textLines = setting.text.split('\n');
+                    let maxWidth = 0; textLines.forEach(line => { const m = ctx.measureText(line); if (m.width > maxWidth) maxWidth = m.width; });
+                    const lineHeight = 16, padding = 6;
+                    const boxWidth = maxWidth + (padding * 2), boxHeight = (textLines.length * lineHeight) + (padding * 2);
+                    
+                    let boxX, boxY;
+                    if (setting.x !== undefined && setting.y !== undefined) {
+                        boxX = setting.x;
+                        boxY = setting.y;
+                    } else {
+                        const offset = 40; 
+                        boxX = x + offset; 
+                        boxY = y - offset - boxHeight;
+                        
+                        if (boxY < 10) { boxY = y + offset; }
+                        if (boxX + boxWidth > chart.width - 10) { boxX = x - offset - boxWidth; }
+                        if (boxX < 0) boxX = 10;
+                    }
+
+                    let arrowTargetX = x, arrowTargetY = y;
+
+                    ctx.save(); 
+                    ctx.beginPath(); 
+                    ctx.moveTo(arrowTargetX, arrowTargetY); 
+                    
+                    let connectX = (boxX > x) ? boxX : boxX + boxWidth; 
+                    if (x >= boxX && x <= boxX + boxWidth) connectX = x;
+
+                    let connectY = (boxY > y) ? boxY : boxY + boxHeight; 
+                    if (y >= boxY && y <= boxY + boxHeight) connectY = y;
+
+                    ctx.lineTo(connectX, connectY);
+                    ctx.strokeStyle = 'black'; ctx.lineWidth = 1.5; ctx.stroke();
+                    
+                    ctx.beginPath(); ctx.arc(x, y, 3, 0, 2 * Math.PI); ctx.fillStyle = 'black'; ctx.fill();
+                    
+                    ctx.fillStyle = 'rgba(255, 255, 200, 0.9)'; ctx.fillRect(boxX, boxY, boxWidth, boxHeight); 
+                    ctx.strokeStyle = '#666'; ctx.lineWidth = 1; ctx.strokeRect(boxX, boxY, boxWidth, boxHeight);
+                    ctx.fillStyle = 'black'; ctx.textBaseline = 'top'; 
+                    textLines.forEach((line, idx) => { ctx.fillText(line, boxX + padding, boxY + padding + (idx * lineHeight)); }); 
+                    ctx.restore();
+
+                    chart.repBox = { x: boxX, y: boxY, w: boxWidth, h: boxHeight };
+                }
+            } else {
+                chart.repBox = null;
+            }
+        }};
+
+        const createScaleConfig = (isLog, axisSettings, axisTitle) => {
+            const scientificFormatter = (val) => {
+                const str = val.toExponential(0).toUpperCase().replace('+', ''); 
+                const parts = str.split('E');
+                if (parts.length === 2) { const num = parts[0]; let exp = parseInt(parts[1]); const sign = exp >= 0 ? '+' : '-'; exp = Math.abs(exp).toString().padStart(2, '0'); return `${num}E${sign}${exp}`; }
+                return str;
+            };
+            return {
+                type: isLog ? 'logarithmic' : 'linear',
+                title: { 
+                    display: true, 
+                    text: axisTitle, 
+                    color: '#333',
+                    font: { size: 12, weight: 'bold' }
+                },
+                min: axisSettings.min || undefined, max: axisSettings.max || undefined,
+                grid: {
+                    color: (ctx) => {
+                        // 線形(Linear)のグリッド色設定（Y軸：e, X軸なし）
+                        // より濃い灰色 (#94a3b8) に変更
+                        if(!isLog) return '#94a3b8'; 
+                        
+                        const val = ctx.tick.value; if (val === 0) return 'rgba(0,0,0,0)'; 
+                        const log10 = Math.log10(val); const isMajor = (Math.abs(log10 - Math.round(log10)) < 1e-9); 
+                        // ログ(Log)のグリッド色設定
+                        // メジャー: #475569 (濃いslate), マイナー: #94a3b8 (中間のslate)
+                        return isMajor ? '#475569' : '#94a3b8'; 
+                    },
+                    borderColor: '#000', tickLength: 5
+                },
+                ticks: {
+                    color: '#000', autoSkip: false, maxRotation: 0,
+                    stepSize: (!isLog) ? (axisSettings.step || undefined) : undefined,
+                    callback: function(value) {
+                        if (isLog) {
+                            const log10 = Math.log10(value);
+                            if (Math.abs(Math.round(log10) - log10) < 1e-9) { if (value < 0.01 || value > 10000) return scientificFormatter(value); return value.toLocaleString(); }
+                            return ''; 
+                        } else { return parseFloat(value.toFixed(4)); }
+                    }
+                },
+                afterBuildTicks: (axis) => { if (isLog) { const min = axis.min; const max = axis.max; const customTicks = generateLogTicks(min, max); axis.ticks = customTicks.map(v => ({ value: v })); } }
+            };
+        };
+
+        const chart = new Chart(ctx, {
+            type: 'scatter', data: { datasets }, plugins: [repCurvePlugin],
+            options: {
+                animation: false, responsive: true, maintainAspectRatio: false,
+                scales: {
+                    // X軸設定 (e-logPなら'圧密圧力 P'、それ以外は'平均圧密圧力 P_avg')
+                    x: createScaleConfig(true, {min: settings.xMin, max: settings.xMax, step: settings.xStep}, xAxisLabel),
+                    // Y軸設定
+                    y: createScaleConfig(isLogY, {min: settings.yMin, max: settings.yMax, step: settings.yStep}, yAxisLabel)
+                },
+                plugins: { 
+                    legend: { position: 'bottom', labels: { boxWidth: 8, font: { size: 10 }, color: '#333' } },
+                    tooltip: { 
+                        filter: function(e) { return !draggingLabel; },
+                        callbacks: { label: function(context) { return (context.dataset.label||'') + `: (${context.parsed.x}, ${context.parsed.y})`; } } 
+                    }
+                }
+            }
+        });
+        chartInstances.push(chart);
+        setTimeout(() => { updateTableVisibility(canvasId); }, 0);
+    }
+
+    function setRepresentativeCurve() { 
+        document.getElementById('contextMenu').classList.add('hidden');
+        if (!ctxMenuTarget.chart) return;
+        const chart = ctxMenuTarget.chart;
+        const chartId = chart.canvas.id;
+        
+        let defaultText = "代表曲線";
+        if (ctxMenuTarget.type === 'cv') {
+            const range = prompt("正規圧密領域のCv値の範囲を入力してください\n(例: 50～80)", "50～80");
+            if (range === null) return;
+            defaultText = `代表曲線\n正規圧密領域のCvは\n${range}cm2/d程度`;
+        } else {
+            const input = prompt("吹き出しに表示するテキストを入力してください", defaultText);
+            if (input === null) return;
+            defaultText = input;
+        }
+
+        // 初期位置は未設定（自動）
+        representativeSettings[chartId] = { datasetIndex: ctxMenuTarget.datasetIndex, text: defaultText };
+
+        chart.data.datasets.forEach((dataset, index) => {
+            if (index === ctxMenuTarget.datasetIndex) {
+                dataset.borderWidth = 4;
+                dataset.pointRadius = currentPointSize + 2;
+                dataset.order = 0;
+            } else {
+                dataset.borderWidth = 1.5;
+                dataset.pointRadius = currentPointSize;
+                dataset.order = 10;
+            }
+            if(dataset.originalColor) {
+                dataset.borderColor = dataset.originalColor;
+                dataset.backgroundColor = dataset.originalColor;
+            }
+        });
+
+        chart.update();
+        updateTableVisibility(chartId); 
+    }
+
+    function removeRepresentativeCurve() { 
+        document.getElementById('contextMenu').classList.add('hidden');
+        if (!ctxMenuTarget.chart) return;
+        const chart = ctxMenuTarget.chart;
+        const chartId = chart.canvas.id;
+        
+        delete representativeSettings[chartId];
+
+        chart.data.datasets.forEach(dataset => {
+            dataset.borderWidth = 1.5;
+            dataset.pointRadius = currentPointSize;
+            dataset.order = 1;
+            if(dataset.originalColor) {
+                dataset.borderColor = dataset.originalColor;
+                dataset.backgroundColor = dataset.originalColor;
+            }
+        });
+
+        chart.update();
+        updateTableVisibility(chartId);
+    }
+
+    function saveData() { 
+        const j = JSON.stringify({ data: globalData, rep: representativeSettings, axis: specificAxisSettings }, null, 2); 
+        const b = new Blob([j], {type: "application/json"}); 
+        const a = document.createElement('a'); a.href = URL.createObjectURL(b); a.download = "data_v4.6.json"; a.click(); 
+    }
+    function loadData(input) { 
+        const r = new FileReader(); 
+        r.onload = e => { 
+            try { 
+                const j = JSON.parse(e.target.result); 
+                if(j.data){ globalData=j.data; representativeSettings=j.rep||{}; specificAxisSettings=j.axis||{}; } else { globalData=j; representativeSettings={}; specificAxisSettings={}; } 
+                initFilters(); refreshView(); 
+            } catch(z) { alert('エラー'); } 
+        }; 
+        r.readAsText(input.files[0]); 
+    }
+
+    // --- 設定モーダル関連 ---
+    let currentEditTarget = null;
+    function calculateBestInputStep(maxVal) { if (!maxVal && maxVal !== 0) return 1; const absVal = Math.abs(maxVal); if (absVal === 0) return 1; if (absVal <= 1) return 0.01; if (absVal <= 10) return 0.1; if (absVal >= 100) return 10; return 1; }
+    function openAxisSettings(groupKey, type) {
+        currentEditTarget = { group: groupKey, type: type };
+        document.getElementById('axisModalTitle').innerText = `対象: ${groupKey} - ${type}`;
+        tempSettingsBackup = JSON.parse(JSON.stringify(specificAxisSettings));
+        const chartUniqueId = `${groupKey}-${type}`;
+        const s = specificAxisSettings[chartUniqueId] || {};
+        const canvasId = `chart-${groupKey}-${type}`.replace(/\s/g, '');
+        const refChart = Chart.getChart(canvasId);
+        let autoVals = { xMin: null, xMax: null, xStep: null, yMin: null, yMax: null, yStep: null };
+        if (refChart) {
+            const scales = refChart.scales; autoVals.xMin = scales.x.min; autoVals.xMax = scales.x.max; autoVals.yMin = scales.y.min; autoVals.yMax = scales.y.max;
+            const calcStep = (scale) => { if (scale.type !== 'linear') return null; const ticks = scale.getTicks(); if (ticks.length >= 2) { return parseFloat(Math.abs(ticks[1].value - ticks[0].value).toPrecision(10)); } return null; };
+            autoVals.xStep = calcStep(scales.x); autoVals.yStep = calcStep(scales.y);
+        }
+        const getVal = (saved, auto) => { if (saved !== null && saved !== undefined && saved !== "") return saved; if (auto !== null && auto !== undefined) return parseFloat(auto.toPrecision(6)); return ""; };
+        const xMinInput = document.getElementById('axisXMin'); const xMaxInput = document.getElementById('axisXMax'); const xStepInput = document.getElementById('axisXStep');
+        const yMinInput = document.getElementById('axisYMin'); const yMaxInput = document.getElementById('axisYMax'); const yStepInput = document.getElementById('axisYStep');
+        xMinInput.value = getVal(s.xMin, autoVals.xMin); xMaxInput.value = getVal(s.xMax, autoVals.xMax); xStepInput.value = getVal(s.xStep, autoVals.xStep);
+        yMinInput.value = getVal(s.yMin, autoVals.yMin); yMaxInput.value = getVal(s.yMax, autoVals.yMax); yStepInput.value = getVal(s.yStep, autoVals.yStep);
+        const xInputStep = calculateBestInputStep(parseFloat(xMaxInput.value) || 100); const yInputStep = calculateBestInputStep(parseFloat(yMaxInput.value) || 10);
+        [xMinInput, xMaxInput, xStepInput].forEach(el => el.step = xInputStep); [yMinInput, yMaxInput, yStepInput].forEach(el => el.step = yInputStep);
+        document.getElementById('axisSettingsModal').classList.remove('hidden');
+    }
+    function previewAxisSettings() {
+        if(!currentEditTarget) return;
+        const g = (id)=>document.getElementById(id).value; const p=(v)=>v?parseFloat(v):null; 
+        const chartUniqueId = `${currentEditTarget.group}-${currentEditTarget.type}`;
+        specificAxisSettings[chartUniqueId] = { xMin: p(g('axisXMin')), xMax: p(g('axisXMax')), xStep: p(g('axisXStep')), yMin: p(g('axisYMin')), yMax: p(g('axisYMax')), yStep: p(g('axisYStep')) }; 
+        refreshView(); 
+    }
+    function cancelAxisSettings() { if (tempSettingsBackup) { specificAxisSettings = tempSettingsBackup; tempSettingsBackup = null; refreshView(); } document.getElementById('axisSettingsModal').classList.add('hidden'); currentEditTarget=null; }
+    function applyAxisSettings() { tempSettingsBackup = null; document.getElementById('axisSettingsModal').classList.add('hidden'); currentEditTarget=null; }
+    function resetAxisSettings() {
+         if(!currentEditTarget) return;
+         const chartUniqueId = `${currentEditTarget.group}-${currentEditTarget.type}`;
+         delete specificAxisSettings[chartUniqueId];
+         document.getElementById('axisXMin').value = ""; document.getElementById('axisXMax').value = ""; document.getElementById('axisXStep').value = "";
+         document.getElementById('axisYMin').value = ""; document.getElementById('axisYMax').value = ""; document.getElementById('axisYStep').value = "";
+         refreshView();
+    }
+
+    function openDataListModal() { document.getElementById('dataListModal').classList.remove('hidden'); showListView(); }
+    function closeDataListModal() { document.getElementById('dataListModal').classList.add('hidden'); }
+    function showListView() { 
+        document.getElementById('dataListView').classList.remove('hidden'); document.getElementById('dataEditView').classList.add('hidden'); document.getElementById('btnBackToList').classList.add('hidden'); document.getElementById('btnSaveEdit').classList.add('hidden'); document.getElementById('btnCloseList').classList.remove('hidden');
+        const tbody = document.getElementById('dataListTableBody'); tbody.innerHTML = '';
+        if (globalData.length === 0) { tbody.innerHTML = '<tr><td colspan="6" class="text-center py-4 text-gray-400">データがありません</td></tr>'; return; }
+        globalData.forEach(d => {
+            const tr = document.createElement('tr'); tr.className = "hover:bg-blue-50 transition-colors border-b";
+            const countEp = d.ep ? d.ep.length : 0; const countCv = d.cv ? d.cv.length : 0; const countMv = d.mv ? d.mv.length : 0;
+            tr.innerHTML = `<td class="py-2 px-4 font-medium">${d.hole}</td><td class="py-2 px-4">${d.sample||'-'}</td><td class="py-2 px-4">${d.depth}</td><td class="py-2 px-4"><span class="bg-gray-200 px-2 py-0.5 rounded text-xs">${d.layer}</span></td><td class="py-2 px-4 text-center text-xs text-gray-500">e:${countEp}, Cv:${countCv}, mv:${countMv}</td><td class="py-2 px-4 text-center space-x-2"><button onclick="editDataItem(${d.id})" class="text-blue-600 hover:text-blue-800" title="編集"><i class="fas fa-edit"></i></button><button onclick="deleteDataItem(${d.id})" class="text-red-600 hover:text-red-800" title="削除"><i class="fas fa-trash-alt"></i></button></td>`;
+            tbody.appendChild(tr);
+        });
+    }
+    function deleteDataItem(id) { if(!confirm("このデータを削除しますか？")) return; globalData = globalData.filter(d => d.id !== id); initFilters(); refreshView(); showListView(); }
+    function editDataItem(id) { 
+        const target = globalData.find(d => d.id === id); if(!target) return;
+        currentEditingId = id; 
+        document.getElementById('dataListView').classList.add('hidden'); document.getElementById('dataEditView').classList.remove('hidden'); document.getElementById('btnBackToList').classList.remove('hidden'); document.getElementById('btnSaveEdit').classList.remove('hidden'); document.getElementById('btnCloseList').classList.add('hidden');
+        document.getElementById('editHole').value = target.hole; 
+        document.getElementById('editSample').value = target.sample || ''; 
+        document.getElementById('editDepth').value = target.depth; 
+        document.getElementById('editLayer').value = target.layer;
+        const pointsToText = (arr) => arr ? arr.map(p => `${p.x}, ${p.y}`).join('\n') : "";
+        document.getElementById('editEpData').value = pointsToText(target.ep); document.getElementById('editCvData').value = pointsToText(target.cv); document.getElementById('editMvData').value = pointsToText(target.mv);
+    }
+    function saveEditedData() { 
+        const id = currentEditingId; const targetIndex = globalData.findIndex(d => d.id === id); if(targetIndex === -1) return;
+        const textToPoints = (text) => text.split('\n').map(l => {const p=l.split(/,|、|\t|\s+/); if(p.length<2)return null; const x=parseFloat(p[0]),y=parseFloat(p[1]); return (!isNaN(x)&&!isNaN(y))?{x,y}:null}).filter(p=>p);
+        globalData[targetIndex].hole = document.getElementById('editHole').value; 
+        globalData[targetIndex].sample = document.getElementById('editSample').value; 
+        globalData[targetIndex].depth = document.getElementById('editDepth').value; 
+        globalData[targetIndex].layer = document.getElementById('editLayer').value;
+        globalData[targetIndex].ep = textToPoints(document.getElementById('editEpData').value); globalData[targetIndex].cv = textToPoints(document.getElementById('editCvData').value); globalData[targetIndex].mv = textToPoints(document.getElementById('editMvData').value);
+        alert("データを更新しました"); initFilters(); refreshView(); showListView();
+    }
+</script>
+</body>
+</html>

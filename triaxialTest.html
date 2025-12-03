@@ -1,0 +1,1131 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>三軸試験整理システム</title>
+<link rel="icon" href='data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🌈</text></svg>'>
+<!-- Plotly.js -->
+<script src="https://cdn.plot.ly/plotly-2.27.0.min.js"></script>
+<!-- Handsontable v6.2.2 -->
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/handsontable@6.2.2/dist/handsontable.full.min.css">
+<script src="https://cdn.jsdelivr.net/npm/handsontable@6.2.2/dist/handsontable.full.min.js"></script>
+<style>
+body { font-family: "Helvetica Neue", Arial, sans-serif; margin: 0; display: flex; height: 100vh; overflow: hidden; color: #333; }
+/* 左サイドバー */
+.sidebar {
+width: 320px; background-color: #1e2634; color: #ecf0f1; padding: 15px;
+display: flex; flex-direction: column; gap: 15px; overflow-y: auto; border-right: 1px solid #000; flex-shrink: 0;
+}
+.sidebar-panel {
+background: #2c3e50; padding: 10px; border-radius: 6px; border: 1px solid #455a64;
+}
+.sidebar h3 { margin: 0 0 10px 0; font-size: 14px; color: #bdc3c7; border-bottom: 1px solid #555; padding-bottom: 5px; }
+/* ボタン群 */
+.btn-group { display: flex; gap: 5px; margin-bottom: 10px; }
+.btn-sidebar {
+flex: 1; padding: 8px; border: none; border-radius: 4px; color: white; cursor: pointer; font-size: 12px; font-weight: bold; text-align: center;
+transition: opacity 0.2s; text-decoration: none; display: inline-block;
+}
+.btn-sidebar:hover { opacity: 0.9; }
+.btn-green { background-color: #27ae60; }
+.btn-orange { background-color: #d35400; }
+.btn-blue { background-color: #2980b9; width: 100%; display: block; margin-bottom: 5px;}
+/* 入力・スライダー */
+.control-item { margin-bottom: 12px; }
+.control-label { display: flex; justify-content: space-between; align-items: center; font-size: 12px; margin-bottom: 4px; }
+.slider { -webkit-appearance: none; width: 100%; height: 4px; background: #95a5a6; outline: none; border-radius: 2px; }
+.slider::-webkit-slider-thumb { -webkit-appearance: none; appearance: none; width: 16px; height: 16px; border-radius: 50%; background: #3498db; cursor: pointer; }
+
+/* リセットボタン */
+.btn-reset {
+background: #7f8c8d; color: white; border: none; border-radius: 3px;
+width: 20px; height: 20px; font-size: 12px; cursor: pointer; margin-left: 5px;
+display: inline-flex; justify-content: center; align-items: center;
+}
+.btn-reset:hover { background: #95a5a6; }
+/* フィルタ */
+.filter-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 5px; font-size: 12px; }
+.filter-actions a { color: #64b5f6; cursor: pointer; margin-left: 8px; }
+.filter-actions a:hover { text-decoration: underline; }
+.checkbox-list { max-height: 150px; overflow-y: auto; background: #34495e; padding: 5px; border-radius: 4px; }
+.checkbox-item { display: flex; align-items: center; margin-bottom: 4px; cursor: pointer; font-size: 12px; }
+.checkbox-item input { margin-right: 8px; }
+/* メインコンテンツ */
+.main-content {
+flex-grow: 1; padding: 20px; background-color: #f4f6f7;
+overflow-y: auto; display: flex; flex-direction: column;
+}
+header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px; }
+/* タブ切り替えスタイル */
+.tabs { display: flex; gap: 4px; margin-bottom: 0; border-bottom: 2px solid #2c3e50; flex-wrap: wrap; }
+.tab-btn {
+padding: 8px 16px; cursor: pointer; background: #bdc3c7; border: 1px solid #95a5a6; border-bottom: none;
+border-radius: 4px 4px 0 0; font-weight: bold; color: #2c3e50; transition: all 0.2s; min-width: 100px; text-align: center; font-size: 13px;
+}
+.tab-btn:hover { background: #d0d7de; }
+.tab-btn.active { background: #2c3e50; color: #fff; border-color: #2c3e50; }
+/* グラフエリア */
+.view-section { display: none; padding-top: 20px; }
+.view-section.active { display: block; }
+.charts-wrapper { display: flex; gap: 20px; flex-wrap: wrap; margin-bottom: 20px; }
+.chart-card {
+flex: 1; min-width: 450px;
+background: white; border-radius: 6px; border: 1px solid #ccc;
+box-shadow: 0 2px 4px rgba(0,0,0,0.1); padding: 15px; display: flex; flex-direction: column;
+}
+.chart-card.full-width { flex: 100%; }
+.chart-container { width: 100%; /* heightはJSで制御 */ }
+/* 結果パネル */
+.res-panel {
+padding: 8px 12px; margin-bottom: 10px; border-radius: 4px;
+border-left: 5px solid #555; background: #fafafa; display: flex; align-items: center; flex-wrap: wrap; gap: 10px; font-size: 13px;
+}
+.res-total { background: #fffde7; border-color: #fbc02d; }
+.res-eff { background: #e8f5e9; border-color: #43a047; }
+.res-santoubun { background: #e3f2fd; border-color: #2196f3; }
+.res-uu { background: #f3e5f5; border-color: #8e24aa; }
+.res-cd { background: #e0f2f1; border-color: #009688; }
+.res-residual { background: #eceff1; border-color: #607d8b; }
+.res-title { font-weight: bold; margin-right: 5px; font-size: 14px; min-width: 80px;}
+.param-box { display: inline-flex; align-items: baseline; white-space: nowrap; }
+.param-label { color: #666; margin-right: 2px; font-size:12px; }
+.param-val { font-weight: bold; font-size: 15px; color: #000; }
+.param-sep { border-left: 1px solid #999; padding-left: 8px; margin-left: 2px; display: flex; align-items: center; gap: 5px;}
+.toggle-c0-label { font-size: 11px; cursor: pointer; display: flex; align-items: center; color: #d35400; font-weight: bold;}
+.toggle-c0-label input { margin-right: 3px; }
+/* 凡例・計算ボタンエリア */
+.right-ctrl { margin-left: auto; display: flex; gap: 10px; align-items: center; }
+.legend-ctrl select { font-size: 11px; padding: 2px; border-radius: 3px; border: 1px solid #ccc; background: white; cursor: pointer; }
+.btn-calc-detail {
+font-size: 11px; background: #fff; border: 1px solid #ccc; border-radius: 3px; cursor: pointer; padding: 2px 6px;
+display: inline-flex; align-items: center; gap: 3px; color: #555; font-weight: bold;
+}
+.btn-calc-detail:hover { background: #f0f0f0; border-color: #999; color: #000; }
+/* データテーブル */
+.table-container {
+background: white; padding: 15px; border-radius: 6px;
+border: 1px solid #ccc; box-shadow: 0 2px 4px rgba(0,0,0,0.1); overflow-x: auto; margin-top: auto;
+}
+table { width: 100%; border-collapse: collapse; font-size: 12px; color: #333; white-space: nowrap; }
+th, td { border: 1px solid #ddd; padding: 6px; text-align: center; }
+th { background-color: #f8f9fa; color: #333; font-weight: bold; border-bottom: 2px solid #ccc; }
+tr:nth-child(even) { background-color: #fcfcfc; }
+tr:hover { background-color: #f1f1f1; }
+tr.row-excluded td { color: #999; background-color: #f0f0f0; }
+.badge { display: inline-block; padding: 2px 6px; border-radius: 3px; color: #fff; font-size: 10px; font-weight: bold; }
+.badge-CU { background: #2980b9; }
+.badge-UU { background: #8e24aa; }
+.badge-CD { background: #009688; }
+/* モーダル共通 */
+.modal-overlay {
+position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+background: rgba(0,0,0,0.6); z-index: 1000; display: none;
+justify-content: center; align-items: center;
+}
+.modal {
+background: white; width: 90%; max-width: 1200px; height: 85vh;
+border-radius: 6px; padding: 20px; display: flex; flex-direction: column;
+box-shadow: 0 10px 25px rgba(0,0,0,0.3);
+}
+.modal-small { max-width: 700px; height: auto; max-height: 80vh; }
+.modal-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; }
+.modal-body { flex-grow: 1; overflow: auto; border: 1px solid #ccc; position: relative; padding: 10px; background: #fff;}
+.modal-actions { margin-top: 15px; text-align: right; }
+.btn-cancel { background: #95a5a6; color: white; border: none; padding: 8px 20px; border-radius: 4px; cursor: pointer; margin-right: 10px; }
+.btn-save { background: #2980b9; color: white; border: none; padding: 8px 20px; border-radius: 4px; cursor: pointer; }
+/* 計算詳細用 */
+.calc-info-block { margin-bottom: 20px; border-bottom: 1px dashed #ccc; padding-bottom: 15px; }
+.calc-formula { font-family: "Times New Roman", Times, serif; font-style: italic; background: #f9f9f9; padding: 10px; border-radius: 4px; text-align: center; font-size: 16px; color: #444; margin: 10px 0; border: 1px solid #eee; }
+.calc-table { width: 100%; font-size: 12px; margin-top: 10px; }
+.calc-table th { background: #eee; text-align: center; }
+.calc-table td { text-align: right; font-family: monospace; }
+.calc-result-row { font-weight: bold; background: #e3f2fd; }
+/* Handsontable Overrides */
+.handsontable th { background-color: #f0f0f0; font-weight: bold; color: #333; }
+</style>
+</head>
+<body>
+
+<!-- 左サイドバー -->
+<div class="sidebar">
+    <div style="display: flex; align-items: center; justify-content: center; margin-bottom: 15px; color: #fff;">
+        <span style="font-size: 17px; font-weight: bold;">🌈三軸圧縮試験整理システム</span>
+        <span onclick="openHelpModal()" style="margin-left:8px; cursor:pointer; background:#7f8c8d; color:#fff; width:20px; height:20px; border-radius:50%; display:inline-flex; align-items:center; justify-content:center; font-size:12px; font-weight:bold;" title="使い方ガイド" onmouseover="this.style.background='#95a5a6'" onmouseout="this.style.background='#7f8c8d'">?</span>
+    </div>
+
+<div class="sidebar-panel">
+    <h3>データ入出力</h3>
+    <div class="btn-group">
+        <button class="btn-sidebar btn-green" onclick="saveData()">💾 保存 (JSON)</button>
+        <button class="btn-sidebar btn-orange" onclick="document.getElementById('fileInput').click()">📂 読込</button>
+        <input type="file" id="fileInput" accept=".json" style="display: none;" onchange="loadDataFile(this)">
+    </div>
+    <button class="btn-sidebar btn-blue" onclick="openModal()">⊞ データ編集・登録</button>
+</div>
+
+<div class="sidebar-panel">
+    <h3>グラフ設定 (<span id="currentSettingLabel" style="color:#f1c40f">CU</span>)</h3>
+    
+    <div class="control-item">
+        <div class="control-label">
+            <span>グラフ高さ</span>
+            <div><span id="labelHeight">450px</span><button class="btn-reset" onclick="resetHeight()" title="初期値に戻す">↺</button></div>
+        </div>
+        <input type="range" min="300" max="800" value="450" class="slider" id="sliderHeight" oninput="updateCurrentSettings()">
+    </div>
+    
+    <div class="control-item">
+        <div class="control-label"><span>軸・タイトル文字サイズ</span><span id="labelAxisFontSize">12px</span></div>
+        <input type="range" min="10" max="24" value="12" class="slider" id="sliderAxisFontSize" oninput="updateCurrentSettings()">
+    </div>
+
+    <div class="control-item">
+        <div class="control-label"><span>凡例文字サイズ</span><span id="labelLegendFontSize">12px</span></div>
+        <input type="range" min="10" max="24" value="12" class="slider" id="sliderLegendFontSize" oninput="updateCurrentSettings()">
+    </div>
+
+    <hr style="border:0; border-top:1px solid #555; margin:10px 0;">
+
+    <div class="control-item">
+        <div class="control-label"><span>X軸 最大(σ)</span><span id="labelXMax">1500</span></div>
+        <input type="range" min="100" max="3000" step="100" value="1500" class="slider" id="sliderXMax" oninput="updateCurrentSettings()">
+    </div>
+
+    <div class="control-item">
+        <div class="control-label"><span>Y軸 最大(τ)</span><span id="labelYMax">800</span></div>
+        <input type="range" min="100" max="2000" step="100" value="800" class="slider" id="sliderYMax" oninput="updateCurrentSettings()">
+    </div>
+</div>
+
+<div class="sidebar-panel">
+    <div class="filter-header">
+        <span style="color:#bdc3c7; font-weight:bold;">孔番 (Boring No.)</span>
+        <div class="filter-actions"><a onclick="toggleAll('boring', true)">全選択</a><a onclick="toggleAll('boring', false)">全解除</a></div>
+    </div>
+    <div id="filterBoringList" class="checkbox-list"></div>
+</div>
+
+<div class="sidebar-panel">
+    <div class="filter-header">
+        <span style="color:#bdc3c7; font-weight:bold;">試料 (Sample No.)</span>
+        <div class="filter-actions"><a onclick="toggleAll('sample', true)">全選択</a><a onclick="toggleAll('sample', false)">全解除</a></div>
+    </div>
+    <div id="filterSampleList" class="checkbox-list"></div>
+</div>
+
+<div class="sidebar-panel">
+    <div class="filter-header">
+        <span style="color:#bdc3c7; font-weight:bold;">土層 (Layer)</span>
+        <div class="filter-actions"><a onclick="toggleAll('layer', true)">全選択</a><a onclick="toggleAll('layer', false)">全解除</a></div>
+    </div>
+    <div id="filterLayerList" class="checkbox-list"></div>
+</div>
+</div>
+<!-- メインコンテンツ -->
+<div class="main-content">
+
+<div class="tabs">
+    <div class="tab-btn" onclick="switchTab('uu')" id="tabUU">UU試験</div>
+    <div class="tab-btn active" onclick="switchTab('standard')" id="tabStandard">CU試験 (圧密非排水)</div>
+    <div class="tab-btn" onclick="switchTab('santoubun')" id="tabSantoubun">CU試験 (三等分法)</div>
+    <div class="tab-btn" onclick="switchTab('cd')" id="tabCD">CD試験</div>
+    <div class="tab-btn" onclick="switchTab('residual')" id="tabResidual" style="background:#e0e0e0; color:#555;">残留強度</div>
+</div>
+
+<!-- 1. CU 標準解析ビュー -->
+<div id="viewStandard" class="view-section active">
+    <div class="charts-wrapper">
+        <!-- Total Stress Chart -->
+        <div class="chart-card">
+            <div class="res-panel res-total">
+                <div class="res-title">CU(全応力)</div>
+                <div class="param-box"><span class="param-label">c=</span><span class="param-val" id="res_c_total">-</span></div>
+                <div class="param-box"><span class="param-label">φ=</span><span class="param-val" id="res_phi_total">-</span></div>
+                <div class="param-box"><span class="param-label">tanφ=</span><span class="param-val" id="res_tanphi_total">-</span></div>
+                <div class="param-box"><span class="param-label">R²=</span><span class="param-val" id="res_r2_total">-</span></div>
+                
+                <div class="param-box param-sep">
+                    <label class="toggle-c0-label"><input type="checkbox" id="check_c0_total" checked onchange="updateDashboard(true)">C=0</label>
+                </div>
+                <div class="param-box"><span class="param-label">φ=</span><span class="param-val" id="res_phi_total_c0">-</span></div>
+                <div class="param-box"><small>(n=<span id="count_total">0</span>)</small></div>
+
+                <div class="right-ctrl">
+                    <button class="btn-calc-detail" onclick="showCalcDetail('total')">🧮 詳細</button>
+                    <div class="legend-ctrl"><select onchange="changeLegendPosition('chartTotal', this.value)"><option value="right" selected>右側</option><option value="bottom">下側</option><option value="inside">内側</option></select></div>
+                </div>
+            </div>
+            <div id="chartTotal" class="chart-container"></div>
+        </div>
+        <!-- Effective Stress Chart -->
+        <div class="chart-card">
+            <div class="res-panel res-eff">
+                <div class="res-title">CU(有効応力)</div>
+                <div class="param-box"><span class="param-label">c'=</span><span class="param-val" id="res_c_eff">-</span></div>
+                <div class="param-box"><span class="param-label">φ'=</span><span class="param-val" id="res_phi_eff">-</span></div>
+                <div class="param-box"><span class="param-label">tanφ'=</span><span class="param-val" id="res_tanphi_eff">-</span></div>
+                <div class="param-box"><span class="param-label">R²=</span><span class="param-val" id="res_r2_eff">-</span></div>
+                
+                <div class="param-box param-sep">
+                    <label class="toggle-c0-label"><input type="checkbox" id="check_c0_eff" checked onchange="updateDashboard(true)">C=0</label>
+                </div>
+                <div class="param-box param-sep" style="border-left:none; margin-left:5px;">
+                    <label class="toggle-c0-label" style="color:#2980b9;" title="原点(0,0)をデータ点として追加して回帰します">
+                        <input type="checkbox" id="check_origin_eff" onchange="updateDashboard(true)">+(0,0)
+                    </label>
+                </div>
+
+                <div class="param-box"><span class="param-label">φ'=</span><span class="param-val" id="res_phi_eff_c0">-</span></div>
+                <div class="param-box"><small>(n=<span id="count_eff">0</span>)</small></div>
+
+                <div class="right-ctrl">
+                    <button class="btn-calc-detail" onclick="showCalcDetail('eff')">🧮 詳細</button>
+                    <div class="legend-ctrl"><select onchange="changeLegendPosition('chartEff', this.value)"><option value="right" selected>右側</option><option value="bottom">下側</option><option value="inside">内側</option></select></div>
+                </div>
+            </div>
+            <div id="chartEff" class="chart-container"></div>
+        </div>
+    </div>
+</div>
+
+<!-- 2. CU 三等分法ビュー -->
+<div id="viewSantoubun" class="view-section">
+    <div class="charts-wrapper">
+        <div class="chart-card full-width">
+            <div class="res-panel res-santoubun">
+                <div class="res-title">三等分法 (τ=√2/3 q)</div>
+                <div class="param-box"><span class="param-label">c=</span><span class="param-val" id="res_c_san">-</span></div>
+                <div class="param-box"><span class="param-label">φ=</span><span class="param-val" id="res_phi_san">-</span></div>
+                <div class="param-box"><span class="param-label">tanφ=</span><span class="param-val" id="res_tanphi_san">-</span></div>
+                <div class="param-box"><span class="param-label">R²=</span><span class="param-val" id="res_r2_san">-</span></div>
+                <div class="param-box"><small>(n=<span id="count_san">0</span>)</small></div>
+                
+                <div class="right-ctrl">
+                    <button class="btn-calc-detail" onclick="showCalcDetail('santoubun')">🧮 詳細</button>
+                    <div class="legend-ctrl"><select onchange="changeLegendPosition('chartSantoubun', this.value)"><option value="right" selected>右側</option><option value="bottom">下側</option><option value="inside">内側</option></select></div>
+                </div>
+            </div>
+            <div id="chartSantoubun" class="chart-container"></div>
+        </div>
+    </div>
+</div>
+
+<!-- 3. UU試験ビュー -->
+<div id="viewUU" class="view-section">
+    <div class="charts-wrapper">
+        <div class="chart-card full-width">
+            <div class="res-panel res-uu">
+                <div class="res-title">UU試験</div>
+                <div class="param-box"><span class="param-label">Cu=</span><span class="param-val" id="res_c_uu">-</span></div>
+                <div class="param-box"><span class="param-label">φu=</span><span class="param-val" id="res_phi_uu">-</span></div>
+                <div class="param-box"><span class="param-label">tanφu=</span><span class="param-val" id="res_tanphi_uu">-</span></div>
+                <div class="param-box"><span class="param-label">R²=</span><span class="param-val" id="res_r2_uu">-</span></div>
+
+                <div class="param-box param-sep">
+                    <label class="toggle-c0-label" title="摩擦角を0とし、最大圧縮応力の平均値をCuとします">
+                        <input type="checkbox" id="check_phi0_uu" onchange="updateDashboard(true)">φ=0
+                    </label>
+                </div>
+
+                <div class="param-box"><small>(n=<span id="count_uu">0</span>)</small></div>
+
+                <div class="right-ctrl">
+                    <button class="btn-calc-detail" onclick="showCalcDetail('uu')">🧮 詳細</button>
+                    <div class="legend-ctrl"><select onchange="changeLegendPosition('chartUU', this.value)"><option value="right" selected>右側</option><option value="bottom">下側</option><option value="inside">内側</option></select></div>
+                </div>
+            </div>
+            <div id="chartUU" class="chart-container"></div>
+        </div>
+    </div>
+</div>
+
+<!-- 4. CD試験ビュー -->
+<div id="viewCD" class="view-section">
+    <div class="charts-wrapper">
+        <div class="chart-card full-width">
+            <div class="res-panel res-cd">
+                <div class="res-title">CD試験</div>
+                <div class="param-box"><span class="param-label">Cd=</span><span class="param-val" id="res_c_cd">-</span></div>
+                <div class="param-box"><span class="param-label">φd=</span><span class="param-val" id="res_phi_cd">-</span></div>
+                <div class="param-box"><span class="param-label">tanφd=</span><span class="param-val" id="res_tanphi_cd">-</span></div>
+                <div class="param-box"><span class="param-label">R²=</span><span class="param-val" id="res_r2_cd">-</span></div>
+                
+                <div class="param-box param-sep">
+                    <label class="toggle-c0-label"><input type="checkbox" id="check_c0_cd" checked onchange="updateDashboard(true)">C=0</label>
+                </div>
+                <div class="param-box param-sep" style="border-left:none; margin-left:5px;">
+                    <label class="toggle-c0-label" style="color:#2980b9;" title="原点(0,0)をデータ点として追加して回帰します">
+                        <input type="checkbox" id="check_origin_cd" onchange="updateDashboard(true)">+(0,0)
+                    </label>
+                </div>
+
+                <div class="param-box"><span class="param-label">φd=</span><span class="param-val" id="res_phi_cd_c0">-</span></div>
+                <div class="param-box"><small>(n=<span id="count_cd">0</span>)</small></div>
+
+                <div class="right-ctrl">
+                    <button class="btn-calc-detail" onclick="showCalcDetail('cd')">🧮 詳細</button>
+                    <div class="legend-ctrl"><select onchange="changeLegendPosition('chartCD', this.value)"><option value="right" selected>右側</option><option value="bottom">下側</option><option value="inside">内側</option></select></div>
+                </div>
+            </div>
+            <div id="chartCD" class="chart-container"></div>
+        </div>
+    </div>
+</div>
+
+<!-- 5. 残留強度ビュー -->
+<div id="viewResidual" class="view-section">
+    <div class="charts-wrapper">
+        <div class="chart-card full-width">
+            <div class="res-panel res-residual">
+                <div class="res-title">残留強度</div>
+                <div class="param-box"><span class="param-label">cr=</span><span class="param-val" id="res_c_res">-</span></div>
+                <div class="param-box"><span class="param-label">φr=</span><span class="param-val" id="res_phi_res">-</span></div>
+                <div class="param-box"><span class="param-label">tanφr=</span><span class="param-val" id="res_tanphi_res">-</span></div>
+                <div class="param-box"><span class="param-label">R²=</span><span class="param-val" id="res_r2_res">-</span></div>
+                
+                <div class="param-box param-sep">
+                    <label class="toggle-c0-label"><input type="checkbox" id="check_c0_res" checked onchange="updateDashboard(true)">C=0</label>
+                </div>
+                <div class="param-box param-sep" style="border-left:none; margin-left:5px;">
+                    <label class="toggle-c0-label" style="color:#2980b9;" title="原点(0,0)をデータ点として追加して回帰します">
+                        <input type="checkbox" id="check_origin_res" onchange="updateDashboard(true)">+(0,0)
+                    </label>
+                </div>
+
+                <div class="param-box"><span class="param-label">φr=</span><span class="param-val" id="res_phi_res_c0">-</span></div>
+                <div class="param-box"><small>(n=<span id="count_res">0</span>)</small></div>
+
+                <div class="right-ctrl">
+                    <button class="btn-calc-detail" onclick="showCalcDetail('residual')">🧮 詳細</button>
+                    <div class="legend-ctrl"><select onchange="changeLegendPosition('chartResidual', this.value)"><option value="right" selected>右側</option><option value="bottom">下側</option><option value="inside">内側</option></select></div>
+                </div>
+            </div>
+            <div id="chartResidual" class="chart-container"></div>
+        </div>
+    </div>
+</div>
+
+<div class="table-container">
+    <h3 style="margin-top:0;">解析対象データ一覧</h3>
+    <table>
+        <thead>
+            <tr>
+                <th style="width:40px; background:#ffebee; color:#c0392b;">除外</th>
+                <th>タイプ</th><th>孔番</th><th>試料</th><th>深度 (m)</th><th>土層</th>
+                <th>St.</th>
+                <th>σ3 (セル圧)</th><th>圧縮強さ q</th><th>間隙水圧 u</th>
+                <th style="background:#e3f2fd;">τ (1/3法)</th>
+                <th style="background:#bbdefb;">σ'3 (有効)</th>
+                <th>p' (平均)</th><th>q' (最大)</th>
+            </tr>
+        </thead>
+        <tbody id="dataTableBody"></tbody>
+    </table>
+</div>
+<!-- ▼▼▼ 免責事項・フッター ▼▼▼ -->
+<footer style="font-size: 12px; text-align: center; padding: 20px; color: #6c757d; background-color: #f8f9fa; border-top: 1px solid #e9ecef; margin: -20px -20px -50px -20px;">
+    <div style="display: flex; justify-content: center; align-items: center; gap: 20px; flex-wrap: wrap; margin-bottom: 10px;">
+        <p id="lastUpdated" style="margin: 0; font-weight: 500;"></p>
+        <button id="legal-toggle" style="background: none; border: none; cursor: pointer; font-weight: bold; color: #4b5563; text-decoration: underline; padding: 5px;">
+            免責事項 (クリックで表示)
+        </button>
+    </div>
+
+    <div id="legal-details" style="display: none; margin-top: 15px; border-top: 1px solid #d1d5db; padding-top: 15px; text-align: left; max-width: 800px; margin-left: auto; margin-right: auto; line-height: 1.6;">
+        <p style="text-align: center; font-weight: bold; margin-bottom: 5px; color: #374151;">
+            Copyright &copy; 2025 (株)地圏総合コンサルタント All Rights Reserved.
+        </p>
+        <p style="font-size: 11px; color: #6b7280; text-align: center; margin-bottom: 15px;">
+            Developed by: Naoya.Onozato
+        </p>
+        
+        <div style="background-color: #fff7ed; border: 1px solid #fdba74; color: #c2410c; padding: 10px; border-radius: 6px; margin-bottom: 15px; font-weight: bold; text-align: center;">
+            ⚠ 本システムの再配布・第三者への提供を禁止します。
+        </div>
+
+        <div style="font-size: 11px; color: #4b5563;">
+            <p style="margin-bottom: 10px;">
+                <strong>【免責事項】</strong><br>
+                本システム（三軸圧縮試験整理システム）の利用によって生じたいかなる損害についても、開発者および著作権者は一切の責任を負いません。<br>
+                本ツールはあくまで業務補助を目的としたものであり、出力される強度定数（c, φ）や破壊包絡線、回帰分析結果（R²）等は、必ず専門技術者が妥当性を確認・検証した上で使用してください。<br>
+                特に除外データの選定や解析手法（全応力/有効応力/三等分法）の選択は利用者の判断に委ねられます。
+            </p>
+            <p style="margin-bottom: 0;">
+                <strong>【使用ライブラリ】</strong><br>
+                Plotly.js, Handsontable
+            </p>
+        </div>
+    </div>
+</footer>
+
+<script>
+    (function() {
+        const lastUpdatedEl = document.getElementById('lastUpdated');
+        if (lastUpdatedEl) { 
+            const now = new Date();
+            lastUpdatedEl.textContent = `最終更新日: 2025年11月26日`; 
+        }
+        const legalToggle = document.getElementById('legal-toggle');
+        const legalDetails = document.getElementById('legal-details');
+        
+        if (legalToggle && legalDetails) {
+            legalToggle.addEventListener('click', function() {
+                const isHidden = legalDetails.style.display === 'none';
+                legalDetails.style.display = isHidden ? 'block' : 'none';
+                legalToggle.textContent = isHidden ? '免責事項 (クリックで非表示)' : '免責事項 (クリックで表示)';
+                if (isHidden) {
+                    setTimeout(() => {
+                        const mainContent = document.querySelector('.main-content');
+                        if(mainContent) { mainContent.scrollTo({ top: mainContent.scrollHeight, behavior: 'smooth' }); }
+                    }, 100);
+                }
+            });
+        }
+    })();
+</script>
+<!-- ▲▲▲ 免責事項・フッターここまで ▲▲▲ -->
+
+</div>
+<!-- データ登録モーダル -->
+<div id="importModal" class="modal-overlay">
+<div class="modal">
+<div class="modal-header">
+<h2 style="margin:0;">データ編集・登録</h2>
+<div style="font-size:12px; color:#555;">
+Excelデータをここに貼り付けるか、直接編集してください。<br>
+「反映」ボタンを押すと解析が実行されます。
+</div>
+</div>
+<div class="modal-body" id="hotContainer" style="padding:0;"></div>
+<div class="modal-actions">
+<button class="btn-cancel" onclick="closeModal()">キャンセル</button>
+<button class="btn-save" onclick="loadDataFromHot()">反映して解析</button>
+</div>
+</div>
+</div>
+<!-- 計算詳細表示モーダル -->
+<div id="calcModal" class="modal-overlay">
+<div class="modal modal-small">
+<div class="modal-header">
+<h3 style="margin:0;">🧮 計算プロセス詳細</h3>
+<button onclick="document.getElementById('calcModal').style.display='none'" class="btn-reset" style="font-size:16px;">×</button>
+</div>
+<div class="modal-body" id="calcDetailBody">
+<!-- JSで動的に挿入 -->
+</div>
+</div>
+</div>
+
+<div id="helpModal" class="modal-overlay">
+    <div class="modal modal-small">
+        <div class="modal-header">
+            <h3 style="margin:0;">📖 使い方ガイド</h3>
+            <button onclick="document.getElementById('helpModal').style.display='none'" class="btn-reset" style="font-size:16px;">×</button>
+        </div>
+        <div class="modal-body" style="line-height: 1.6; color:#444;">
+            <h4 style="border-bottom:1px solid #ddd; padding-bottom:5px; margin-top:0;">📂 1. データ入力</h4>
+            <p>「⊞ データ編集・登録」ボタンからスプレッドシートを開き、Excelデータを貼り付けてください。<br>
+            ※ <strong>σ3</strong> (セル圧) と <strong>q</strong> (最大圧縮強さ) は必須です。<br>
+            ※ 有効応力解析には <strong>間隙水圧</strong> の入力が必要です。</p>
+
+            <h4 style="border-bottom:1px solid #ddd; padding-bottom:5px;">📊 2. 解析と除外</h4>
+            <p>下部の表にある <strong>「除外」</strong> チェックボックスをONにすると、そのデータを計算から外し、グラフを点線表示にします。<br>
+            <strong>「C=0」</strong>: 切片を強制的に0として回帰します。<br>
+            <strong>「+(0,0)」</strong>: データ点として原点(0,0)を1つ追加して回帰分析を行います（切片は0になりやすいですが強制ではありません）。</p>
+            <p>UU試験では<strong>「φ=0」</strong>をチェックすると、回帰を行わず最大圧縮強さの平均値をCuとして水平な包絡線を描きます。</p>
+
+            <h4 style="border-bottom:1px solid #ddd; padding-bottom:5px;">🎨 3. 表示調整</h4>
+            <p>左サイドバーのスライダーで、グラフの<strong>高さ</strong>や<strong>軸の最大値</strong>を調整できます。<br>
+            特定の孔番だけを見たい場合は、サイドバー下部のフィルタをご利用ください。</p>
+            
+            <h4 style="border-bottom:1px solid #ddd; padding-bottom:5px;">💾 4. 保存</h4>
+            <p>「💾 保存」ボタンで、現在のデータと表示設定をJSONファイルとして保存・復元できます。</p>
+        </div>
+        <div class="modal-actions">
+            <button class="btn-save" onclick="document.getElementById('helpModal').style.display='none'">閉じる</button>
+        </div>
+    </div>
+</div>
+
+<script>
+let allSamples = [];
+let hotInstance = null;
+let currentView = 'standard';
+const COLORS = ['#e74c3c', '#3498db', '#2ecc71', '#9b59b6', '#f39c12', '#1abc9c', '#34495e', '#7f8c8d'];
+
+// --- 設定管理 ---
+const defaultSettings = {
+height: 450,
+axisFontSize: 12,
+legendFontSize: 12,
+xMax: 1500,
+yMax: 800
+};
+
+let viewSettings = {
+standard: { ...defaultSettings },
+santoubun: { ...defaultSettings },
+uu: { ...defaultSettings },
+cd: { ...defaultSettings },
+residual: { ...defaultSettings }
+};
+
+let legendPositions = {
+chartTotal: 'right', chartEff: 'right', chartSantoubun: 'right',
+chartUU: 'right', chartCD: 'right', chartResidual: 'right'
+};
+
+let lastCalculationResults = {};
+const initialData = [];
+
+window.onload = function() {
+initHandsontable();
+loadDataFromHot();
+syncSidebarToSettings('standard');
+window.addEventListener('resize', resizeCharts);
+};
+
+function openHelpModal() {
+    document.getElementById('helpModal').style.display = 'flex';
+}
+
+// --- データ保存・読込機能 ---
+function saveData() {
+const saveObj = { data: allSamples, settings: viewSettings, legendPositions: legendPositions };
+const blob = new Blob([JSON.stringify(saveObj, null, 2)], {type: "application/json"});
+const url = URL.createObjectURL(blob);
+const a = document.createElement('a');
+a.href = url; a.download = "triaxial_data_" + new Date().toISOString().slice(0,10) + ".json";
+document.body.appendChild(a); a.click(); document.body.removeChild(a); URL.revokeObjectURL(url);
+}
+
+function loadDataFile(input) {
+const file = input.files[0];
+if (!file) return;
+const reader = new FileReader();
+reader.onload = function(e) {
+try {
+const json = JSON.parse(e.target.result);
+if (Array.isArray(json)) allSamples = json;
+else if (json.data && json.settings) {
+allSamples = json.data;
+viewSettings = { ...viewSettings, ...json.settings };
+if(json.legendPositions) legendPositions = { ...legendPositions, ...json.legendPositions };
+}
+initFilters();
+syncSidebarToSettings(currentView);
+updateLegendSelectUI();
+updateDashboard();
+alert("読み込み完了: " + allSamples.length + "件");
+} catch (err) { alert("エラー: " + err); }
+};
+reader.readAsText(file);
+input.value = '';
+}
+
+function updateLegendSelectUI() {
+Object.keys(legendPositions).forEach(id => {
+const sel = document.querySelector(`.res-panel select[onchange*="${id}"]`);
+if(sel) sel.value = legendPositions[id];
+});
+}
+
+function updateCurrentSettings() {
+const h = parseInt(document.getElementById('sliderHeight').value);
+const af = parseInt(document.getElementById('sliderAxisFontSize').value);
+const lf = parseInt(document.getElementById('sliderLegendFontSize').value);
+const xMax = parseInt(document.getElementById('sliderXMax').value);
+const yMax = parseInt(document.getElementById('sliderYMax').value);
+viewSettings[currentView] = { height: h, axisFontSize: af, legendFontSize: lf, xMax: xMax, yMax: yMax };
+document.getElementById('labelHeight').innerText = h + 'px';
+document.getElementById('labelAxisFontSize').innerText = af + 'px';
+document.getElementById('labelLegendFontSize').innerText = lf + 'px';
+document.getElementById('labelXMax').innerText = xMax;
+document.getElementById('labelYMax').innerText = yMax;
+document.querySelectorAll('.chart-container').forEach(div => div.style.height = h + 'px');
+// スライダー操作時はズームをリセット(false)して、設定値を反映させる
+updateDashboard(false); setTimeout(resizeCharts, 50);
+}
+function resetHeight() { document.getElementById('sliderHeight').value = 450; updateCurrentSettings(); }
+
+function syncSidebarToSettings(mode) {
+const s = viewSettings[mode];
+document.getElementById('sliderHeight').value = s.height;
+document.getElementById('labelHeight').innerText = s.height + 'px';
+document.getElementById('sliderAxisFontSize').value = s.axisFontSize;
+document.getElementById('labelAxisFontSize').innerText = s.axisFontSize + 'px';
+document.getElementById('sliderLegendFontSize').value = s.legendFontSize;
+document.getElementById('labelLegendFontSize').innerText = s.legendFontSize + 'px';
+document.getElementById('sliderXMax').value = s.xMax;
+document.getElementById('labelXMax').innerText = s.xMax;
+document.getElementById('sliderYMax').value = s.yMax;
+document.getElementById('labelYMax').innerText = s.yMax;
+const labelMap = { 'standard': 'CU', 'santoubun': 'CU(三等分)', 'uu': 'UU', 'cd': 'CD', 'residual': '残留強度' };
+document.getElementById('currentSettingLabel').innerText = labelMap[mode];
+}
+
+function resizeCharts() {
+['chartTotal', 'chartEff', 'chartSantoubun', 'chartUU', 'chartCD', 'chartResidual'].forEach(id => {
+const el = document.getElementById(id);
+if(el && el.offsetParent !== null) Plotly.Plots.resize(id);
+});
+}
+
+function switchTab(mode) {
+currentView = mode;
+syncSidebarToSettings(mode);
+const viewMap = { 'standard': 'Standard', 'santoubun': 'Santoubun', 'uu': 'UU', 'cd': 'CD', 'residual': 'Residual' };
+Object.keys(viewMap).forEach(key => {
+document.getElementById('tab'+viewMap[key]).classList.toggle('active', key===mode);
+document.getElementById('view'+viewMap[key]).classList.toggle('active', key===mode);
+});
+document.querySelectorAll('.chart-container').forEach(div => div.style.height = viewSettings[mode].height + 'px');
+updateDashboard(false); setTimeout(resizeCharts, 50);
+}
+
+function changeLegendPosition(chartId, pos) {
+legendPositions[chartId] = pos;
+const el = document.getElementById(chartId);
+if(el && el.data) Plotly.relayout(chartId, getLegendLayout(pos));
+}
+function getLegendLayout(pos) {
+const s = viewSettings[currentView];
+const baseLegend = { font: { size: s.legendFontSize }, bgcolor: 'rgba(255,255,255,0.8)', bordercolor: '#ccc', borderwidth: 1 };
+if (pos === 'bottom') return { legend: { ...baseLegend, orientation: 'h', x: 0, y: -0.15, xanchor: 'left', yanchor: 'top' }, margin: { t: 50, b: 80, l: 60, r: 20 } };
+else if (pos === 'inside') return { legend: { ...baseLegend, orientation: 'v', x: 0.02, y: 0.98, xanchor: 'left', yanchor: 'top' }, margin: { t: 50, b: 40, l: 60, r: 20 } };
+else return { legend: { ...baseLegend, orientation: 'v', x: 1.02, y: 1, xanchor: 'left', yanchor: 'top' }, margin: { t: 50, b: 40, l: 60, r: 150 } };
+}
+
+// --- Handsontable ---
+function initHandsontable() {
+hotInstance = new Handsontable(document.getElementById('hotContainer'), {
+data: initialData, rowHeaders: true, width: '100%', height: '100%', licenseKey: 'non-commercial-and-evaluation', stretchH: 'all', manualColumnResize: true, contextMenu: true, minSpareRows: 5,
+colHeaders: ['孔番', '試料番号', '深度(上端)', '深度(下端)', '土層', '試験タイプ', 'セル圧(1)', 'セル圧(2)', 'セル圧(3)', 'セル圧(4)', '背圧(1)', '背圧(2)', '背圧(3)', '背圧(4)', 'q(1)', 'q(2)', 'q(3)', 'q(4)', '残留q(1)', '残留q(2)', '残留q(3)', '残留q(4)', '間隙水圧(1)', '間隙水圧(2)', '間隙水圧(3)', '間隙水圧(4)', '残留水圧(1)', '残留水圧(2)', '残留水圧(3)', '残留水圧(4)'],
+columns: [ {type:'text'}, {type:'text'}, {type:'numeric',format:'0.00'}, {type:'numeric',format:'0.00'}, {type:'text'}, {type:'dropdown',source:['CU','UU','CD'],width:80},
+{type:'numeric'},{type:'numeric'},{type:'numeric'},{type:'numeric'}, {type:'numeric'},{type:'numeric'},{type:'numeric'},{type:'numeric'},
+{type:'numeric'},{type:'numeric'},{type:'numeric'},{type:'numeric'}, {type:'numeric'},{type:'numeric'},{type:'numeric'},{type:'numeric'},
+{type:'numeric'},{type:'numeric'},{type:'numeric'},{type:'numeric'}, {type:'numeric'},{type:'numeric'},{type:'numeric'},{type:'numeric'} ]
+});
+}
+function generateHotDataFromSamples() {
+if (allSamples.length === 0) return initialData;
+const rows = [];
+allSamples.forEach(s => {
+const row = Array(30).fill(null);
+row[0]=s.boring; row[1]=s.sampleNo;
+let dTop=s.depthTop, dBtm=s.depthBottom;
+if(dTop===undefined && s.depth) { const parts=String(s.depth).split('-'); dTop=parts[0]?parseFloat(parts[0]):null; dBtm=parts[1]?parseFloat(parts[1]):null; }
+row[2]=dTop; row[3]=dBtm; row[4]=s.layer; row[5]=s.testType;
+s.points.forEach(p => { const i=p.stage-1; if(i>=0&&i<4){ row[6+i]=p.sigma3; row[10+i]=p.backPressure; row[14+i]=p.q; row[18+i]=p.q_res; row[22+i]=p.u; row[26+i]=p.u_res; } });
+rows.push(row);
+});
+return rows;
+}
+function openModal() { hotInstance.loadData(generateHotDataFromSamples()); document.getElementById('importModal').style.display = 'flex'; setTimeout(() => hotInstance.render(), 100); }
+function closeModal() { document.getElementById('importModal').style.display = 'none'; }
+function loadDataFromHot() {
+const rawData = hotInstance.getData(); allSamples = [];
+rawData.forEach((row, idx) => {
+if (!row[0] || !row[6] || !row[14]) return;
+const type = row[5] ? String(row[5]).trim().toUpperCase() : 'CU';
+const dTop=row[2], dBtm=row[3];
+let depthStr = (dTop!==null&&dBtm!==null) ? `${parseFloat(dTop).toFixed(2)} - ${parseFloat(dBtm).toFixed(2)}` : (dTop||dBtm);
+const sample = { id: idx, boring: row[0], sampleNo: row[1], depthTop: dTop, depthBottom: dBtm, depthDisplay: depthStr, layer: row[4], testType: type, points: [] };
+for (let i = 0; i < 4; i++) {
+const s3_cell = parseFloat(row[6 + i]), back_pres = parseFloat(row[10 + i]) || 0, q = parseFloat(row[14 + i]), q_res = parseFloat(row[18 + i]), u_pore = parseFloat(row[22 + i]), u_res = parseFloat(row[26 + i]);
+if (!isNaN(s3_cell) && !isNaN(q)) {
+const s1_total = s3_cell + q; const tau_san = (Math.sqrt(2)/3) * q;
+let u_val = isNaN(u_pore) ? 0 : u_pore; if (type === 'CD' && isNaN(u_pore)) u_val = back_pres;
+const s3_eff = (s3_cell + back_pres) - u_val; const s1_eff = s3_eff + q;
+let residualObj = null;
+if (!isNaN(q_res)) {
+let u_res_val = isNaN(u_res) ? u_val : u_res;
+const s3_eff_res = (s3_cell + back_pres) - u_res_val; const s1_eff_res = s3_eff_res + q_res;
+residualObj = { sigma3: s3_eff_res, sigma1: s1_eff_res, center: (s1_eff_res + s3_eff_res) / 2, radius: (s1_eff_res - s3_eff_res) / 2, q: q_res };
+}
+sample.points.push({ stage: i + 1, sigma3: s3_cell, q: q, u: u_pore, backPressure: back_pres, q_res: q_res, u_res: u_res, excluded: false,
+total: { sigma3: s3_cell, sigma1: s1_total, center: (s1_total + s3_cell)/2, radius: (s1_total - s3_cell)/2 },
+santoubun: { x: s3_cell, y: tau_san },
+eff: { sigma3: s3_eff, sigma1: s1_eff, center: (s1_eff + s3_eff)/2, radius: (s1_eff - s3_eff)/2 },
+residual: residualObj, sigma3_eff_disp: s3_eff
+});
+}
+}
+if (sample.points.length > 0) allSamples.push(sample);
+});
+initFilters(); updateDashboard(false); closeModal();
+}
+
+function initFilters() {
+renderFilter('filterBoringList', 'boring', [...new Set(allSamples.map(s => s.boring))].sort());
+renderFilter('filterLayerList', 'layer', [...new Set(allSamples.map(s => s.layer))].sort());
+renderFilter('filterSampleList', 'sample', [...new Set(allSamples.map(s => s.sampleNo))].sort());
+}
+function renderFilter(divId, type, items) {
+const container = document.getElementById(divId); container.innerHTML = '';
+items.forEach(item => { const div = document.createElement('div'); div.className = 'checkbox-item'; div.innerHTML = `<input type="checkbox" name="filter_${type}" value="${item}" checked onchange="updateDashboard(true)"><span>${item}</span>`; container.appendChild(div); });
+}
+function toggleAll(type, checked) { document.getElementsByName(`filter_${type}`).forEach(input => input.checked = checked); updateDashboard(true); }
+
+function getActiveSamples() {
+const activeBorings = Array.from(document.getElementsByName('filter_boring')).filter(cb => cb.checked).map(cb => cb.value);
+const activeLayers = Array.from(document.getElementsByName('filter_layer')).filter(cb => cb.checked).map(cb => cb.value);
+const activeSamples = Array.from(document.getElementsByName('filter_sample')).filter(cb => cb.checked).map(cb => cb.value);
+
+let targetType = (currentView==='uu')?'UU':(currentView==='cd')?'CD':(currentView==='residual')?null:'CU';
+return allSamples.filter(s => { 
+    const typeMatch = (targetType === null) ? true : (s.testType === targetType); 
+    return activeBorings.includes(s.boring) 
+        && activeLayers.includes(s.layer) 
+        && activeSamples.includes(s.sampleNo) 
+        && typeMatch; 
+});
+}
+function toggleExclusion(idx, stg) { const p = allSamples[idx].points.find(p => p.stage === stg); if(p){ p.excluded = !p.excluded; updateDashboard(true); } }
+
+// --- メイン解析・描画 ---
+function updateDashboard(maintainZoom = false) {
+const activeSamples = getActiveSamples();
+let tableRows = '';
+let dataTotal = [], dataEff = [], dataSantoubun = [], dataResidual = [];
+let tracesTotal = [], tracesEff = [], tracesSantoubun = [], tracesResidual = [];
+
+activeSamples.forEach((s) => {
+const realIdx = allSamples.indexOf(s);
+const color = COLORS[realIdx % COLORS.length];
+const name = `${s.boring}-${s.sampleNo}`;
+
+s.points.forEach(p => {
+dataTotal.push({ ...p, parent: p });
+if(p.eff) dataEff.push({ ...p, parent: p });
+if(p.residual) dataResidual.push({ ...p, parent: p });
+dataSantoubun.push({ ...p.santoubun, rawPoint: p });
+
+const rowClass = p.excluded ? 'row-excluded' : '';
+const checkedAttr = p.excluded ? 'checked' : '';
+tableRows += `<tr class="${rowClass}">
+<td><input type="checkbox" onchange="toggleExclusion(${realIdx}, ${p.stage})" ${checkedAttr}></td>
+<td><span class="badge badge-${s.testType}">${s.testType}</span></td>
+<td>${s.boring}</td><td>${s.sampleNo}</td><td>${s.depthDisplay||'-'}</td><td>${s.layer}</td>
+<td>${p.stage}</td><td>${p.sigma3}</td><td>${p.q}</td><td>${p.u!==null?p.u:'-'}</td>
+<td style="background:#e3f2fd; font-weight:bold;">${p.santoubun.y.toFixed(1)}</td>
+<td style="background:#bbdefb;">${p.sigma3_eff_disp!==null?p.sigma3_eff_disp.toFixed(1):'-'}</td>
+<td>${p.eff?p.eff.center.toFixed(1):'-'}</td><td>${p.eff?p.eff.radius.toFixed(1):'-'}</td>
+</tr>`;
+});
+
+// Create Traces
+if (currentView === 'standard') {
+tracesTotal.push(...createMohrTracesWithExclusion(s.points.map(p => ({ circle: p.total, excluded: p.excluded })), name, color));
+if(s.points.some(p => p.eff)) tracesEff.push(...createMohrTracesWithExclusion(s.points.map(p => ({ circle: p.eff, excluded: p.excluded })), name, color));
+} else if (currentView === 'uu') {
+tracesTotal.push(...createMohrTracesWithExclusion(s.points.map(p => ({ circle: p.total, excluded: p.excluded })), name, color));
+} else if (currentView === 'cd') {
+if(s.points.some(p => p.eff)) tracesEff.push(...createMohrTracesWithExclusion(s.points.map(p => ({ circle: p.eff, excluded: p.excluded })), name, color));
+} else if (currentView === 'residual') {
+const resPoints = s.points.filter(p => p.residual);
+if(resPoints.length > 0) tracesResidual.push(...createMohrTracesWithExclusion(resPoints.map(p => ({ circle: p.residual, excluded: p.excluded })), name, color));
+} else if (currentView === 'santoubun') {
+const circles = createMohrTracesWithExclusion(s.points.map(p => ({ circle: p.total, excluded: p.excluded })), name, '#7f8c8d');
+circles.forEach(t => { t.line.width=1; t.opacity=t.opacity?t.opacity*0.5:0.5; t.showlegend=false; t.hoverinfo='skip'; });
+tracesSantoubun.push(...circles);
+s.points.forEach(p => {
+const ptColor = p.excluded ? '#95a5a6' : color;
+const dash = p.excluded ? 'dot' : 'dashdot';
+tracesSantoubun.push({ x:[p.sigma3, p.sigma3], y:[0, p.santoubun.y], mode:'lines', type:'scatter', showlegend:false, hoverinfo:'none', line:{color:ptColor, width:1, dash:dash}});
+const term = p.total.radius**2 - p.santoubun.y**2;
+const xInt = (term>=0) ? p.total.center - Math.sqrt(term) : p.total.center;
+tracesSantoubun.push({ x:[p.sigma3, xInt], y:[p.santoubun.y, p.santoubun.y], mode:'lines', type:'scatter', showlegend:false, hoverinfo:'none', line:{color:ptColor, width:1, dash:dash}});
+});
+
+if(s.points.length > 0) {
+    tracesSantoubun.push({ 
+        x: s.points.map(p=>p.santoubun.x), 
+        y: s.points.map(p=>p.santoubun.y), 
+        mode:'markers', type:'scatter', name:name+'(1/3)', 
+        marker:{
+            color: s.points.map(p => p.excluded ? '#bdc3c7' : color), 
+            size: 8,
+            symbol: s.points.map(p => p.excluded ? 'circle-open' : 'circle')
+        }
+    });
+}
+}
+});
+
+document.getElementById('dataTableBody').innerHTML = tableRows;
+const filterValid = (arr) => arr.filter(d => !d.parent.excluded);
+
+// Toggles (C=0, Origin, etc.)
+const showC0_total = document.getElementById('check_c0_total') ? document.getElementById('check_c0_total').checked : false;
+const showC0_eff = document.getElementById('check_c0_eff') ? document.getElementById('check_c0_eff').checked : false;
+const showC0_cd = document.getElementById('check_c0_cd') ? document.getElementById('check_c0_cd').checked : false;
+const showC0_res = document.getElementById('check_c0_res') ? document.getElementById('check_c0_res').checked : false;
+
+const useOrigin_eff = document.getElementById('check_origin_eff') ? document.getElementById('check_origin_eff').checked : false;
+const useOrigin_cd = document.getElementById('check_origin_cd') ? document.getElementById('check_origin_cd').checked : false;
+const useOrigin_res = document.getElementById('check_origin_res') ? document.getElementById('check_origin_res').checked : false;
+
+if (currentView === 'standard') {
+performAnalysis(filterValid(dataTotal), 'chartTotal', 'res_c_total', 'res_phi_total', 'res_tanphi_total', 'res_r2_total', 'res_phi_total_c0', 'count_total', 'CU(全応力)', tracesTotal, 1, showC0_total, 'total', false, maintainZoom, false);
+performAnalysis(filterValid(dataEff), 'chartEff', 'res_c_eff', 'res_phi_eff', 'res_tanphi_eff', 'res_r2_eff', 'res_phi_eff_c0', 'count_eff', 'CU(有効応力)', tracesEff, 2, showC0_eff, 'eff', false, maintainZoom, useOrigin_eff);
+
+} else if (currentView === 'uu') {
+const showPhi0_uu = document.getElementById('check_phi0_uu') ? document.getElementById('check_phi0_uu').checked : false;
+performAnalysis(filterValid(dataTotal), 'chartUU', 'res_c_uu', 'res_phi_uu', 'res_tanphi_uu', 'res_r2_uu', null, 'count_uu', 'UU試験', tracesTotal, 1, false, 'uu', showPhi0_uu, maintainZoom, false);
+
+} else if (currentView === 'cd') {
+performAnalysis(filterValid(dataEff), 'chartCD', 'res_c_cd', 'res_phi_cd', 'res_tanphi_cd', 'res_r2_cd', 'res_phi_cd_c0', 'count_cd', 'CD試験', tracesEff, 2, showC0_cd, 'cd', false, maintainZoom, useOrigin_cd);
+
+} else if (currentView === 'residual') {
+const validRes = filterValid(dataResidual);
+if (validRes.length > 0) {
+    const centers = validRes.map(p => p.residual.center), radii = validRes.map(p => p.residual.radius);
+    
+    // 原点追加ロジック
+    if(useOrigin_res) {
+        centers.push(0);
+        radii.push(0);
+    }
+
+    const res = calcMethod2(centers, radii);
+    const resC0 = calcMethod2_C0(centers, radii);
+    
+    saveCalcResult('residual', res, {method: 'Method 2 (p-q)', centers: centers, radii: radii});
+
+    tracesResidual.push(createEnvelopeTrace(res.c, res.phi, viewSettings[currentView].xMax, '破壊包絡線', 'red'));
+    if(showC0_res) {
+        const trC0 = createEnvelopeTrace(0, resC0, viewSettings[currentView].xMax, 'c=0包絡線', 'red'); trC0.line.dash = 'dash'; trC0.line.width = 2; tracesResidual.push(trC0);
+    }
+    updateResDisplay('res_c_res', 'res_phi_res', 'res_tanphi_res', 'res_r2_res', 'res_phi_res_c0', 'count_res', res, resC0, validRes.length);
+
+    // 残留強度グラフの描画(react使用)
+    const layout = createLayout('残留強度', 'chartResidual');
+    if (maintainZoom) {
+        const el = document.getElementById('chartResidual');
+        if (el && el.layout && el.layout.xaxis && el.layout.xaxis.range) { layout.xaxis.range = el.layout.xaxis.range; }
+        if (el && el.layout && el.layout.yaxis && el.layout.yaxis.range) { layout.yaxis.range = el.layout.yaxis.range; }
+    }
+    Plotly.react('chartResidual', tracesResidual, layout);
+
+} else {
+    clearRes('res_c_res', 'res_phi_res', 'res_tanphi_res', 'res_r2_res', 'res_phi_res_c0', 'count_res');
+    saveCalcResult('residual', null, null);
+    Plotly.purge('chartResidual');
+}
+
+} else if (currentView === 'santoubun') {
+const validSan = dataSantoubun.filter(d => !d.rawPoint.excluded);
+performSantoubunAnalysis(validSan, tracesSantoubun, maintainZoom);
+}
+}
+
+// 解析実行関数
+function performAnalysis(points, chartId, idC, idPhi, idTanPhi, idR2, idPhiC0, idCount, title, traces, method, showC0, resultKey, forcePhi0 = false, maintainZoom = false, includeOrigin = false) {
+    const settings = viewSettings[currentView];
+    if(points.length > 0) {
+        let res, resC0_Phi = 0, debugInfo;
+        
+        let xInput = [], yInput = [];
+        if (method === 1) { // Method 1 (Sigma3 - q)
+            xInput = points.map(p => p.sigma3);
+            yInput = points.map(p => p.q);
+        } else { // Method 2 (p - q) : Effective, CD
+            xInput = points.map(p => p.eff ? p.eff.center : 0);
+            yInput = points.map(p => p.eff ? p.eff.radius : 0);
+        }
+
+        // 原点の追加
+        if (includeOrigin && !forcePhi0) {
+            xInput.push(0);
+            yInput.push(0);
+        }
+
+        if (forcePhi0) {
+            let sumQ = 0; 
+            points.forEach(p => sumQ += p.q);
+            const avgQ = sumQ / points.length;
+            res = { c: avgQ / 2, phi: 0, r2: 0 };
+            debugInfo = { method: 'Fixed Phi=0 (Average q/2)', x: points.map(p => p.sigma3), y: points.map(p => p.q) };
+        } else if (method === 1) {
+            res = calcMethod1(xInput, yInput); 
+            resC0_Phi = calcMethod1_C0(xInput, yInput);
+            debugInfo = { method: 'Method 1 (σ3 - q)', x: xInput, y: yInput };
+        } else {
+            res = calcMethod2(xInput, yInput); 
+            resC0_Phi = calcMethod2_C0(xInput, yInput);
+            debugInfo = { method: 'Method 2 (p - q)', x: xInput, y: yInput };
+        }
+
+        saveCalcResult(resultKey, res, debugInfo);
+        traces.push(createEnvelopeTrace(res.c, res.phi, settings.xMax, '破壊包絡線', 'red'));
+
+        if (showC0 && !forcePhi0) {
+            const trC0 = createEnvelopeTrace(0, resC0_Phi, settings.xMax, 'c=0包絡線', 'red');
+            trC0.line.dash = 'dash'; trC0.line.width = 2; traces.push(trC0);
+        }
+
+        updateResDisplay(idC, idPhi, idTanPhi, idR2, idPhiC0, idCount, res, resC0_Phi, points.length);
+        
+        // ズーム維持ロジック
+        const layout = createLayout(title, chartId);
+        if (maintainZoom) {
+            const el = document.getElementById(chartId);
+            if (el && el.layout && el.layout.xaxis && el.layout.xaxis.range) { layout.xaxis.range = el.layout.xaxis.range; }
+            if (el && el.layout && el.layout.yaxis && el.layout.yaxis.range) { layout.yaxis.range = el.layout.yaxis.range; }
+        }
+        Plotly.react(chartId, traces, layout);
+    } else {
+        clearRes(idC, idPhi, idTanPhi, idR2, idPhiC0, idCount);
+        saveCalcResult(resultKey, null, null);
+        Plotly.purge(chartId);
+    }
+}
+
+function performSantoubunAnalysis(points, traces, maintainZoom = false) {
+const settings = viewSettings[currentView];
+if(points.length > 0) {
+const xVals = points.map(p => p.x), yVals = points.map(p => p.y);
+const reg = linearRegression(xVals, yVals);
+const a = reg.slope, b = reg.intercept;
+let phiDeg = (a > 0) ? Math.atan(a) * 180 / Math.PI : 0;
+
+const res = { c: b, phi: phiDeg, r2: reg.r2, slope: a, intercept: b };
+saveCalcResult('santoubun', res, { method: 'Santoubun (σ3 - τ)', x: xVals, y: yVals, reg: reg });
+
+document.getElementById('res_c_san').innerText = b.toFixed(2);
+document.getElementById('res_phi_san').innerText = phiDeg.toFixed(2);
+document.getElementById('res_tanphi_san').innerText = a.toFixed(3);
+document.getElementById('res_r2_san').innerText = reg.r2.toFixed(3);
+document.getElementById('count_san').innerText = points.length;
+
+traces.push({ x: [0, settings.xMax], y: [b, b + a * settings.xMax], type: 'scatter', mode: 'lines', name: `包絡線`, line: { color: 'red', width: 3 } });
+
+const layout = createLayout('三等分法', 'chartSantoubun');
+if (maintainZoom) {
+    const el = document.getElementById('chartSantoubun');
+    if (el && el.layout && el.layout.xaxis && el.layout.xaxis.range) { layout.xaxis.range = el.layout.xaxis.range; }
+    if (el && el.layout && el.layout.yaxis && el.layout.yaxis.range) { layout.yaxis.range = el.layout.yaxis.range; }
+}
+Plotly.react('chartSantoubun', traces, layout);
+
+} else {
+clearRes('res_c_san', 'res_phi_san', 'res_tanphi_san', 'res_r2_san', null, 'count_san');
+saveCalcResult('santoubun', null, null);
+Plotly.purge('chartSantoubun');
+}
+}
+
+// --- 詳細表示 ---
+function saveCalcResult(key, res, debugInfo) { lastCalculationResults[key] = { result: res, debug: debugInfo }; }
+function showCalcDetail(key) {
+const data = lastCalculationResults[key]; const modalBody = document.getElementById('calcDetailBody');
+if (!data || !data.result) { modalBody.innerHTML = '<p>有効な計算結果がありません。</p>'; document.getElementById('calcModal').style.display = 'flex'; return; }
+const { result, debug } = data;
+let html = `<div class="calc-info-block"><h4>■ 基本情報</h4><div><strong>手法:</strong> ${debug.method}</div><div><strong>データ数 (n):</strong> ${debug.x.length}</div><div><strong>決定係数 (R²):</strong> ${result.r2 ? result.r2.toFixed(4) : '-'}</div></div>`;
+
+if (result.regStats) {
+const s = result.regStats;
+html += `<div class="calc-info-block"><h4>■ 回帰分析 (y = mx + f)</h4><div class="calc-formula">m = ${s.slope.toFixed(4)}, f = ${s.intercept.toFixed(4)}</div></div>`;
+} else if (debug.method.includes('Phi=0')) {
+    html += `<div class="calc-info-block"><h4>■ 計算 (平均法)</h4><div class="calc-formula">Cu = Σq / n = ${result.c.toFixed(3)}</div></div>`;
+}
+
+html += `<div class="calc-info-block"><h4>■ 強度定数への変換</h4>`;
+if (debug.method.includes('Method 1')) {
+html += `<div class="calc-formula">sinφ = m / (2 + m)</div><div>φ = ${result.phi.toFixed(3)}°, c = ${result.c.toFixed(3)}</div>`;
+} else if (debug.method.includes('Method 2')) {
+html += `<div class="calc-formula">sinφ = tan(α) = m</div><div>φ = ${result.phi.toFixed(3)}°, c = ${result.c.toFixed(3)}</div>`;
+} else if (debug.method.includes('Santoubun')) {
+html += `<div class="calc-formula">tanφ = 傾き</div><div>φ = ${result.phi.toFixed(3)}°, c = ${result.c.toFixed(3)}</div>`;
+} else if (debug.method.includes('Phi=0')) {
+    html += `<div class="calc-formula">φ = 0 (固定)</div><div>φ = 0.000°, c = ${result.c.toFixed(3)}</div>`;
+}
+html += `</div><div><h4>■ 使用データ</h4><table class="calc-table"><thead><tr><th>No.</th><th>X</th><th>Y</th></tr></thead><tbody>`;
+for(let i=0; i<debug.x.length; i++) html += `<tr><td>${i+1}</td><td>${debug.x[i].toFixed(2)}</td><td>${debug.y[i].toFixed(2)}</td></tr>`;
+html += `</tbody></table></div>`;
+modalBody.innerHTML = html; document.getElementById('calcModal').style.display = 'flex';
+}
+
+// --- 計算ロジック ---
+function linearRegression(x, y) {
+let sX=0, sY=0, sXY=0, sXX=0, n=0;
+for (let i = 0; i < x.length; i++) { if (isFinite(x[i]) && isFinite(y[i])) { sX+=x[i]; sY+=y[i]; sXY+=x[i]*y[i]; sXX+=x[i]*x[i]; n++; } }
+if (n < 2) return { slope: 0, intercept: 0, r2: 0, error: true };
+const denom = (n * sXX - sX * sX);
+if (Math.abs(denom) < 1e-9) return { slope: 0, intercept: sY/n, r2: 0, error: true };
+const slope = (n * sXY - sX * sY) / denom, intercept = (sY - slope * sX) / n;
+const yMean = sY / n; let ssTotal=0, ssRes=0;
+for(let i=0; i<x.length; i++) { if(isFinite(x[i])&&isFinite(y[i])){ const pred=slope*x[i]+intercept; ssTotal+=Math.pow(y[i]-yMean,2); ssRes+=Math.pow(y[i]-pred,2); } }
+const r2 = (ssTotal === 0) ? 1 : 1 - (ssRes / ssTotal);
+return { slope, intercept, r2, error: false, sumX: sX, sumY: sY, sumXY: sXY, sumXX: sXX, n };
+}
+function linearRegressionOrigin(x, y) {
+let sXY=0, sXX=0, n=0;
+for (let i=0; i<x.length; i++) { if (isFinite(x[i]) && isFinite(y[i])) { sXY+=x[i]*y[i]; sXX+=x[i]*x[i]; n++; } }
+if (n===0 || sXX===0) return 0;
+return sXY / sXX;
+}
+
+function calcMethod1(s3, q) { const r = linearRegression(s3, q); if(r.error) return {c:0,phi:0,r2:0}; const m=r.slope, sin=m/(2+m); return { c:r.intercept/(2*Math.sqrt(1+m)), phi:Math.asin(sin)*180/Math.PI, r2:r.r2, regStats:r }; }
+function calcMethod1_C0(s3, q) { const m = linearRegressionOrigin(s3, q); const sin = m/(2+m); return (sin>=1||sin<0)?0:Math.asin(sin)*180/Math.PI; }
+
+function calcMethod2(p, q) { const r = linearRegression(p, q); if(r.error) return {c:0,phi:0,r2:0}; const m=r.slope; return { c:r.intercept/Math.cos(Math.asin(m)), phi:Math.asin(m)*180/Math.PI, r2:r.r2, regStats:r }; }
+function calcMethod2_C0(p, q) { const m = linearRegressionOrigin(p, q); return (m>=1||m<0)?0:Math.asin(m)*180/Math.PI; }
+
+function updateResDisplay(c, p, tp, r2, pc0, cnt, res, resC0, n) {
+if(c) document.getElementById(c).innerText = res.c.toFixed(2);
+if(p) document.getElementById(p).innerText = res.phi.toFixed(2);
+if(tp) document.getElementById(tp).innerText = Math.tan(res.phi * Math.PI / 180).toFixed(3);
+if(r2) document.getElementById(r2).innerText = res.r2 ? res.r2.toFixed(3) : '-';
+if(pc0 && document.getElementById(pc0)) document.getElementById(pc0).innerText = resC0 ? resC0.toFixed(2) : '-';
+if(cnt) document.getElementById(cnt).innerText = n;
+}
+function clearRes(c, p, tp, r2, pc0, cnt) {
+if(c) document.getElementById(c).innerText = "-";
+if(p) document.getElementById(p).innerText = "-";
+if(tp) document.getElementById(tp).innerText = "-";
+if(r2) document.getElementById(r2).innerText = "-";
+if(pc0 && document.getElementById(pc0)) document.getElementById(pc0).innerText = "-";
+if(cnt) document.getElementById(cnt).innerText = "0";
+}
+
+// --- 描画ヘルパー ---
+function createMohrTracesWithExclusion(dataList, name, color) {
+return dataList.map((d, i) => {
+const circle = d.circle, isExcluded = d.excluded;
+const xVal = [], yVal = []; for (let a = 0; a <= 180; a += 4) { const r = a*Math.PI/180; xVal.push(circle.center+circle.radius*Math.cos(r)); yVal.push(circle.radius*Math.sin(r)); }
+const traceColor = isExcluded ? '#7f8c8d' : color;
+const traceOpacity = isExcluded ? 0.6 : 1.0; 
+return { 
+    x: xVal, y: yVal, 
+    type: 'scatter', mode: 'lines', 
+    name: name, legendgroup: name, 
+    showlegend: (i===0&&color!=='#7f8c8d'&&!isExcluded), 
+    opacity: traceOpacity, 
+    line: { width: 2, color: traceColor, dash: isExcluded?'dot':'solid' }, 
+    hoverinfo: isExcluded?'skip':'all' 
+};
+});
+}
+function createEnvelopeTrace(c, phi, xMax, name, color) { const tan = Math.tan(phi * Math.PI/180); return { x: [0, xMax], y: [c, c + xMax * tan], type: 'scatter', mode: 'lines', name: name, line: { color: color, width: 3 } }; }
+function createLayout(title, chartId) {
+    const s = viewSettings[currentView]; 
+    const legendPos = legendPositions[chartId] || 'right';
+    const commonAxis = {
+        zeroline: true, zerolinecolor: '#333', gridcolor: '#ff9800', gridwidth: 1, linecolor: '#333',
+        minor: { ticklen: 2, gridcolor: '#ffe0b2', gridwidth: 1, nticks: 5 }
+    };
+    return { 
+        title: { text: title, font: { size: s.axisFontSize+4 }, y: 0.95 }, 
+        height: s.height, 
+        font: { family: 'Helvetica Neue, Arial', size: s.axisFontSize },
+        xaxis: { title: ' σ (kN/m²)', range: [0, s.xMax], ...commonAxis },
+        yaxis: { title: ' τ (kN/m²)', scaleanchor: "x", scaleratio: 1, range: [0, s.yMax], ...commonAxis },
+        paper_bgcolor: '#fff', plot_bgcolor: '#fff', hovermode: 'closest', ...getLegendLayout(legendPos)
+    };
+}
+</script>
+</body>
+</html>

@@ -1,0 +1,2134 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>標準貫入試験結果・整理システム</title>
+   <link rel="icon" href='data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🧮</text></svg>'>
+<script src="./lib/chart.umd.min.js"></script>
+  
+  <!-- Handsontable v6.2.2 (商用無料版) -->
+  <script src="./lib/handsontable.full.min.js"></script>
+  <link rel="stylesheet" href="./lib/handsontable.full.min.css" />
+  
+  <script src="./lib/chartjs-plugin-datalabels.min.js"></script>
+  <script src="./lib/html2canvas.min.js"></script>
+  <script src="./lib/pptxgen.bundle.js"></script>
+  <script src="./lib/chartjs-plugin-annotation.min.js"></script>
+
+  <style>
+    :root { --primary-color: #2563eb; --accent-color: #2563eb; --border-color: #d1d5db; --header-bg: #e5e7eb; }
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+        font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Hiragino Sans', 'Hiragino Kaku Gothic ProN', 'BIZ UDPGothic', Meiryo, sans-serif;
+        background: #eef0f2;
+        padding: 0;
+        color: #1f2937;
+    }
+
+    .container {
+        display: grid;
+        grid-template-columns: 260px 1fr;
+        grid-template-rows: auto 1fr;
+        gap: 10px;
+        max-width: 2560px;
+        margin: 0 auto;
+        padding-top: 0px;
+    }
+
+    .main-content {
+        padding-bottom: 50px;
+    }
+
+    .header {
+        grid-column: 1 / 3;
+        grid-row: 1 / 2;
+        position: sticky;
+        top: 0;
+        z-index: 1000;
+        display: flex;
+        justify-content: space-between;
+        align-items: flex-end;
+        flex-wrap: wrap;
+        gap: 15px;
+        margin-bottom: 0;
+        background: #34495e;
+        padding: 10px 20px 0 20px; 
+        border-radius: 0 0 10px 10px;
+        box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        border-bottom: 1px solid #d1d5db;
+        /* ▼▼▼ これを追加してください ▼▼▼ */
+        max-width: 100vw; 
+        /* ▲▲▲ 追加ここまで ▲▲▲ */
+    }
+
+    .sidebar-left {
+        background: #ffffff;
+        padding: 15px;
+        border-radius: 10px;
+        box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        border: 1px solid #d1d5db;
+        position: sticky;
+        top: 50px;
+        max-height: calc(100vh - 110px);
+        overflow-y: auto;
+    }
+
+    .view-container, .legend-box {
+        background: #ffffff;
+        padding: 15px;
+        border-radius: 10px;
+        box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        border: 1px solid #d1d5db;
+    }
+
+    .view-container { margin-bottom: 15px; display: none; }
+
+    .header h1 {
+        font-size: 22px;
+        font-weight: 800;
+        margin: 0;
+        flex-shrink: 0;
+        background-color: transparent;
+        color: #ffffff;
+        padding: 0;
+        border-radius: 0;
+        border: none;
+        box-shadow: none;
+        display: flex;
+        align-items: center;
+        gap: 8px; 
+        cursor: default; 
+        margin-bottom: 10px;
+    }
+    .settings-group { display: flex; align-items: center; gap: 15px; }
+    .standard-selector { display: flex; align-items: center; gap: 10px; background: #f8f9fa; padding: 8px 15px; border-radius: 8px; border: 1px solid var(--border-color); }
+    .standard-selector strong { font-size: 14px; }
+    .standard-selector label { font-size: 14px; cursor: pointer; display: flex; align-items: center; gap: 5px; line-height: 1.2; }
+    .header .btn-group { flex-grow: 1; justify-content: center; }
+
+    .sidebar-section { 
+        border: 2px solid var(--primary-color);
+        border-radius: 8px; 
+        padding: 15px; 
+        margin-bottom: 15px; 
+        background: #fff;
+    }
+    .sidebar-section:last-child { margin-bottom: 0; }
+    .sidebar-section h2 { 
+        font-size: 18px; 
+        margin: 0 0 15px 0; 
+        padding-bottom: 10px; 
+        border-bottom: 1px solid #eee; 
+        color: var(--primary-color);
+    }
+
+    .sidebar-left label { font-weight: 600; font-size: 14px; }
+    .sidebar-left select, .sidebar-left .styled-select { width: 100%; padding: 8px; border: 1px solid var(--border-color); border-radius: 5px; margin-bottom: 15px; }
+
+    .data-input-container { display: grid; grid-template-columns: minmax(0, 1fr) 280px; gap: 15px; }
+    .data-input-container > div { min-width: 0; }
+    #dataGrid, #elevationGrid, #styleGrid { height: 700px; overflow: hidden; width: 100%; }
+    #dataGrid {
+        height: calc(100vh - 180px); 
+        overflow: hidden;
+        width: 100%;
+    }
+    .btn { padding: 10px 20px; border: 1px solid var(--border-color); border-radius: 8px; font-size: 14px; font-weight: 600; cursor: pointer; background: #e5e7eb; color: #374151; transition: background-color 0.2s; }
+    .btn:hover { background: #d1d5db; }
+    .btn-primary { background: var(--primary-color); color: white; border-color: var(--primary-color); }
+    .btn-primary:hover { background: #15803d; }
+    .btn-danger { background: #dc2626; color: white; border-color: #dc2626; }
+    .btn-danger:hover { background: #b91c1c; }
+    .btn-settings { background: #6c757d; color: white; border-color: #6c757d; width: 100%; margin-bottom: 15px; text-align: left; display: flex; align-items: center; justify-content: center; gap: 8px;}
+    .btn-settings:hover { background: #5a6268; }
+    .btn-sm { padding: 5px 10px; font-size: 12px; }
+    .btn-group { display: flex; flex-wrap: wrap; gap: 10px; }
+    .btn-active { background: var(--accent-color); color: white; border-color: var(--accent-color); }
+    .btn-active:hover { background: #1d4ed8; }
+    
+    .sidebar-buttons-row { display: flex; gap: 10px; margin-bottom: 8px; }
+    .sidebar-buttons-row .btn { flex: 1; margin-bottom: 0; justify-content: center; padding: 8px 5px; }
+
+    .btn-save { background-color: #a7d8de !important; border-color: #8ac9d1 !important; color: #1f2937 !important; }
+    .btn-save:hover { background-color: #8ac9d1 !important; }
+    .btn-load { background-color: #c8e6c9 !important; border-color: #a5d6a7 !important; color: #1f2937 !important; }
+    .btn-load:hover { background-color: #a5d6a7 !important; }
+
+    .control-box-blue {
+        border: 2px solid var(--primary-color);
+        background: #ffffff;
+        padding: 15px;
+        border-radius: 10px;
+        box-shadow: 0 2px 5px rgba(0,0,0,0.05);
+        display: flex;
+        align-items: center;
+        gap: 15px;
+        margin-bottom: 15px;
+    }
+
+    .correlation-charts-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 15px; }
+    .chart-box { position: relative; border: 1px solid var(--border-color); padding: 20px 15px 15px 15px; border-radius: 8px; }
+    .view-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px; flex-wrap: wrap; gap: 15px;}
+    .view-header h2 { margin-bottom: 0; }
+    .chart-box h2, .chart-box h3 { font-size: 20px; margin-bottom: 15px; text-align: center; }
+    .chart-box h4 { font-size: 16px; margin-bottom: 10px; text-align: center; }
+    .chart-wrapper { position: relative; height: 600px; }
+    .export-btn { padding: 4px 8px; font-size: 12px; z-index: 10; }
+    .chart-box .export-btn { position: absolute; top: 10px; right: 10px; }
+    #layerSummaryView .chart-box h3 { text-align: left; margin-bottom: 10px; border-bottom: 2px solid var(--primary-color); padding-bottom: 5px;}
+
+
+    .axis-controls { display: inline-flex; align-items: center; gap: 5px; font-size: 14px; }
+    .axis-controls input { width: 80px; padding: 4px 8px; border: 1px solid var(--border-color); border-radius: 5px; }
+
+    .table-container { 
+    overflow-x: auto;
+    overflow-y: auto;       
+    height: auto;
+    max-height: 100%;  
+}
+
+#tableView .table-container {
+    height: 800px;      
+}
+
+#summaryTableContainer .table-container {
+    max-height: none !important;
+    overflow-y: visible !important;
+    height: auto !important;
+}
+
+#dataTable thead th {
+    position: sticky;
+    z-index: 10;
+    background-color: #d1d5db;
+    box-shadow: inset 0 1px 0 #000, inset 0 -1px 0 #000, inset 1px 0 0 #000, inset -1px 0 0 #000;
+}
+
+#dataTable thead tr:nth-child(1) th {
+    top: 0;
+}
+
+#dataTable thead tr:nth-child(2) th {
+    top: 28px; 
+    z-index: 11; 
+}
+    
+    .table-container table { width: 100%; border-collapse: collapse; font-size: 13px; white-space: nowrap; }
+    .table-container thead { background: var(--header-bg); }
+    .table-container th, .table-container td { padding: 6px 10px; text-align: center; border: 1px solid #9ca3af; }
+    .table-container th { padding: 10px; font-weight: 600; }
+
+    #dataTable thead, #summaryDataTable thead { background-color: #d1d5db; }
+    
+    #dataTable th, #dataTable td, #summaryDataTable th, #summaryDataTable td {
+        font-size: 13px;
+        padding: 5px 6px;
+        border: 1px solid #000000;
+    }
+    
+    .cell-overridden { text-decoration: line-through; color: #999; }
+
+    .legend-view-grid { 
+        display: grid; 
+        /* 左:550px, 中:580px, 右:残り(ただし最低280pxは確保) */
+        grid-template-columns: 500px 600px minmax(200px, 1fr); 
+        gap: 15px; 
+        align-items: start; 
+    }
+    .legend-box { margin-bottom: 0; height: 100%; border: 2px solid var(--primary-color); }
+    .legend-box-header { display: flex; justify-content: space-between; align-items: center; }
+    .legend-box h3 { font-size: 18px; margin-bottom: 15px; padding-bottom: 10px; border-bottom: 1px solid var(--border-color); }
+    .legend-box-header h3 { margin-bottom: 0; padding-bottom: 0; border-bottom: none; }
+
+    #styleSettingsContainer { height: 700px; overflow-y: auto; padding-right: 10px; margin-top: 10px; padding-top: 2px; }
+    #styleSettingsList { list-style: none; }
+    
+    .style-setting-item {
+        display: grid;
+        /* グリッドレイアウトを拡張 */
+        grid-template-columns: 30px 60px 50px 100px 100px 100px auto;
+        gap: 5px;
+        align-items: center;
+        padding: 4px;
+        margin-bottom: 4px;
+        border: 1px solid #bdc3c7;
+        border-radius: 6px;
+        box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+        background-color: #fcfcfc;
+        cursor: grab;
+        white-space: nowrap;
+    }
+    
+    .style-setting-item:active { cursor: grabbing; background: #f0f0f0; }
+    .style-setting-item-name { font-weight:bold; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .visibility-toggle { margin: 0; cursor: pointer; align-self: center; justify-self: center; transform: scale(1.2); }
+
+    .settings-buttons { display: grid; grid-template-columns: 1fr; gap: 10px; margin-top: 15px; }
+
+    #frequencyChartsGrid { display: grid; grid-template-columns: repeat(auto-fill, minmax(450px, 1fr)); gap: 15px; }
+    .freq-chart-box { border: 1px solid var(--border-color); border-radius: 8px; overflow: hidden; }
+    .freq-chart-header { display: flex; justify-content: space-between; align-items: center; padding: 8px 15px; font-size: 16px; font-weight: bold; }
+    .freq-chart-header .data-count { font-size: 14px; opacity: 0.9; }
+    .freq-chart-canvas-wrapper { height: 250px; padding: 15px; background: white; }
+    
+    #correctedNChartsGrid { display: grid; grid-template-columns: repeat(auto-fill, minmax(480px, 1fr)); gap: 15px; }
+    .corrected-chart-box { display: flex; flex-direction: column; gap: 10px; }
+    .corrected-chart-box h4 { font-size: 16px; margin-bottom: 0; text-align: center; }
+
+    .correction-controls-wrapper { display: flex; flex-direction: column; gap: 8px; padding: 5px 10px; }
+    .correction-row { display: flex; align-items: center; gap: 10px; }
+    .correction-row .btn-sm { flex-shrink: 0; }
+    .correction-row span { font-weight: bold; font-size: 14px; min-width: 110px; }
+    .correction-row select { padding: 2px; border-radius: 4px; border: 1px solid #ccc; width: 100%; }
+    .reset-button-container { display: flex; justify-content: center; margin-top: 5px; }
+    
+    .val1 { color: #e67e22; }
+    .val2 { color: #27ae60; }
+    .selectable-chart { cursor: crosshair !important; }
+    .correction-instruction-text { font-size: 14px; font-weight: bold; color: #dc2626; text-align: center; padding: 8px; background-color: #fef2f2; border: 1px solid #fecaca; border-radius: 6px; min-height: 2em; margin: 5px 10px; display: flex; align-items: center; justify-content: center; }
+    
+    #customContextMenu { position: absolute; display: none; background-color: white; border: 1px solid #ccc; box-shadow: 2px 2px 5px rgba(0,0,0,0.2); z-index: 2000; list-style: none; padding: 5px 0; border-radius: 5px; }
+    #customContextMenu li { padding: 8px 15px; cursor: pointer; font-size: 14px; }
+    #customContextMenu li:hover { background-color: var(--accent-color); color: white; }
+    
+    .help-button { font-size: 18px; font-weight: bold; color: #fff; background-color: var(--accent-color); border: none; border-radius: 50%; width: 30px; height: 30px; cursor: pointer; line-height: 30px; text-align: center; align-self: center; margin-bottom: 5px; }
+    
+    .modal { display: none; position: fixed; z-index: 2000; left: 0; top: 0; width: 100%; height: 100%; overflow: auto; background-color: rgba(0,0,0,0.5); }
+    .modal-content { background-color: #fefefe; margin: 5% auto; padding: 25px; border: 1px solid #888; width: 95%; max-width: 1100px; border-radius: 10px; position: relative; max-height: 90vh; overflow-y: auto; }
+    .modal-content h3 { margin-top: 0; border-bottom: 2px solid var(--primary-color); padding-bottom: 5px; color: var(--primary-color); }
+    .modal-content h4 { margin-top: 15px; margin-bottom: 10px; font-size: 16px; background: #eee; padding: 5px 10px; border-radius: 5px; }
+    .close-button { color: #aaa; position: absolute; top: 15px; right: 20px; font-size: 28px; font-weight: bold; cursor: pointer; }
+    .close-button:hover, .close-button:focus { color: black; text-decoration: none; }
+
+    .settings-section { 
+        display: grid; 
+        grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); 
+        gap: 20px; 
+        margin-bottom: 20px;
+        background-color: #e8f5e9; 
+        border: 1px solid #a5d6a7; 
+        border-radius: 8px;      
+        padding: 15px;          
+    }
+
+    .settings-item { display: flex; flex-direction: column; gap: 5px; }
+    .settings-item label { font-size: 14px; font-weight: bold; color: #555; }
+    .settings-item select, .settings-item input { padding: 6px; border: 1px solid #ccc; border-radius: 4px; }
+    
+    .settings-tabs { display: flex; border-bottom: 2px solid var(--primary-color); margin-bottom: 20px; gap: 5px; flex-wrap: wrap; }
+    .settings-tab { 
+        padding: 12px 20px; 
+        cursor: pointer; 
+        border: 1px solid #ccc; 
+        border-bottom: none; 
+        border-radius: 8px 8px 0 0; 
+        background: #e9ecef; 
+        font-weight: bold; 
+        color: #555; 
+        font-size: 14px;
+        transition: all 0.2s;
+    }
+    .settings-tab:hover { background: #dfe2e6; }
+    .settings-tab.active { 
+        background: #fff; 
+        color: var(--primary-color); 
+        border-color: var(--primary-color); 
+        border-bottom: 1px solid #fff; 
+        border-top: 4px solid var(--primary-color);
+        margin-bottom: -2px;
+    }
+
+    .settings-content { display: none; }
+    .settings-content.active { display: block; }
+
+    .handsontable th { background-color: var(--header-bg); }
+
+    #statisticsView table, #summaryStatisticsTable { font-size: 14px; }
+    #statisticsView table th, #statisticsView table td,
+    #summaryStatisticsTable th, #summaryStatisticsTable td { color: #000000; border: 1px solid #000000; }
+    .sidebar-left .settings-group { flex-direction: column; gap: 15px; align-items: flex-start; }
+    .sidebar-left .standard-selector { display: flex; flex-direction: column; align-items: flex-start; width: 100%; gap: 8px; padding: 10px; }
+    .sidebar-left .standard-selector div { display: flex; gap: 10px; text-align: center; }
+    #architecturalSettings { display: none; background: #fff8e1; border: 1px solid #ffe57f; padding: 8px 15px; border-radius: 8px; width: 100%; }
+    #architecturalSettings strong { font-size: 14px; width: 100%; margin-bottom: 5px; }
+
+    .header .btn-group {
+        flex-grow: 1;
+        justify-content: center;
+        gap: 4px; 
+        margin-bottom: 0; 
+    }
+
+    .header .btn-group .btn {
+        width: 130px;       
+        text-align: center; 
+        padding: 10px 5px;  
+        flex: none;         
+        border-radius: 8px 8px 0 0;
+        border: none;
+        background: rgba(255, 255, 255, 0.15);
+        color: #ecf0f1;
+        margin-bottom: 0;
+        font-size: 13px;
+        transition: all 0.2s;
+        position: relative;
+        top: 0;
+        white-space: nowrap; 
+    }
+
+    .header .btn-group .btn:hover {
+        background: rgba(255, 255, 255, 0.3);
+        color: #fff;
+    }
+
+    .header .btn-group .btn-active {
+        background: #eef0f2; 
+        color: #2563eb; 
+        font-weight: bold;
+        border-top: 3px solid #2563eb; 
+        color: var(--primary-color);
+    }
+
+    .header .btn-group .btn-active:hover {
+        background: #eef0f2; 
+        color: var(--primary-color) !important; 
+    }
+
+    .std-color-row {
+        display: grid;
+        grid-template-columns: 60px 1fr 40px;
+        gap: 8px;
+        align-items: center;
+        margin-bottom: 8px;
+        background: #f9fafb;
+        padding: 5px;
+        border-radius: 4px;
+        border: 1px solid #e5e7eb;
+    }
+    .std-color-row input[type="text"] {
+        width: 100%;
+        padding: 4px;
+        border: 1px solid #d1d5db;
+        border-radius: 4px;
+        text-align: center;
+        font-weight: bold;
+    }
+    .std-color-row input[type="color"] {
+        width: 100%;
+        height: 30px;
+        border: none;
+        padding: 0;
+        background: none;
+        cursor: pointer;
+    }
+    .delete-row-btn {
+        background: #fee2e2;
+        color: #dc2626;
+        border: 1px solid #fecaca;
+        border-radius: 4px;
+        cursor: pointer;
+        font-weight: bold;
+        height: 30px;
+        line-height: 1;
+    }
+    .delete-row-btn:hover { background: #fecaca; }
+
+    .correction-mode-banner {
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 60px;
+        background-color: rgba(220, 38, 38, 0.95);
+        color: white;
+        z-index: 3000;
+        display: none;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        box-shadow: 0 2px 10px rgba(0,0,0,0.3);
+    }
+    .correction-mode-banner-text {
+        font-size: 16px;
+        font-weight: bold;
+        margin-bottom: 5px;
+    }
+    .correction-mode-banner button {
+        background: white;
+        color: #dc2626;
+        border: none;
+        padding: 4px 15px;
+        border-radius: 20px;
+        font-weight: bold;
+        cursor: pointer;
+    }
+    .correction-mode-banner button:hover {
+        background: #fee2e2;
+    }
+
+    #quickLegendList {
+        list-style: none;
+        padding: 0;
+        max-height: 500px;
+        overflow-y: auto;
+    }
+    #quickLegendModal .modal-content {
+        max-width: 900px;
+    }
+
+    .slider-row {
+        display: grid;
+        grid-template-columns: 1fr 120px 60px 30px; 
+        gap: 10px;
+        align-items: center;
+        margin-bottom: 10px;
+        padding: 5px 0;
+    }
+    .slider-row label {
+        margin-bottom: 0;
+        font-weight: bold;
+        font-size: 14px;
+        color: #555;
+    }
+    .slider-row input[type=range] {
+        width: 100%;
+        cursor: pointer;
+    }
+    .slider-row input[type=number] {
+        width: 100%;
+        padding: 4px;
+        text-align: right;
+        border: 1px solid #ccc;
+        border-radius: 4px;
+    }
+
+    .article-box {
+        background: #fff; border: 1px solid #ccc; border-radius: 8px; padding: 20px; margin-bottom: 20px;
+        box-shadow: 0 2px 5px rgba(0,0,0,0.05);
+    }
+    .article-header {
+        display: flex; justify-content: space-between; align-items: center;
+        border-bottom: 2px solid var(--primary-color); padding-bottom: 10px; margin-bottom: 15px;
+    }
+    .article-header h3 { margin: 0; color: var(--primary-color); }
+    .article-content textarea {
+        width: 100%; min-height: 120px; padding: 10px; border: 1px solid #ccc; border-radius: 5px;
+        font-family: inherit; font-size: 15px; line-height: 1.6; resize: vertical; margin-bottom: 10px;
+    }
+    .article-stats {
+        display: flex; gap: 20px; font-size: 13px; color: #555; background: #f8f9fa; padding: 10px; border-radius: 5px; margin-bottom: 10px; flex-wrap: wrap;
+    }
+    .article-stat-item { display: flex; flex-direction: column; }
+    .article-stat-item strong { color: #333; }
+    
+    @media print {
+        @page { margin: 10mm; size: landscape; } 
+        
+        .header, .sidebar-left, .correction-mode-banner, .btn-group, .help-button, .control-box-blue button, footer, #correctionBanner {
+            display: none !important; 
+        }
+
+        .container {
+            display: block !important;
+            grid-template-columns: 1fr !important;
+            width: 100% !important;
+            height: auto !important;
+            overflow: visible !important;
+        }
+
+        .main-content {
+            padding: 0 !important;
+            width: 100% !important;
+        }
+
+        .view-container {
+            box-shadow: none !important;
+            border: none !important;
+            margin: 0 !important;
+            padding: 0 !important;
+            display: block !important;
+        }
+        
+        .chart-box, .table-container, .article-box {
+            break-inside: avoid;
+            page-break-inside: avoid;
+            border: none !important;
+        }
+        
+        .view-container[style*="display: none"] {
+            display: none !important;
+        }
+        
+        body {
+            background-color: white !important;
+            -webkit-print-color-adjust: exact;
+        }
+    }
+
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div id="correctionBanner" class="correction-mode-banner">
+        <div class="correction-mode-banner-text">⚠️ 補正線入力モード中：グラフ上の始点と終点をクリックしてください</div>
+        <button onclick="resetCorrection(correctionState.testDataId)">中止 / 入力終了</button>
+    </div>
+
+    <header class="header">
+        <h1>🧮標準貫入試験結果・整理システム</h1>
+        <div class="btn-group">
+            <button class="btn btn-active" id="btnDataInputView" onclick="showView('dataInputView')">データ入力</button>
+            <button class="btn" id="btnLegendView" onclick="showView('legendView')">凡例</button>
+            <button class="btn" id="btnTableView" onclick="showView('tableView')">計算結果一覧</button>
+            <button class="btn" id="btnCorrectedNView" onclick="showView('correctedNView')">補正N値</button>
+            <button class="btn" id="btnCorrelationChartView" onclick="showView('correlationChartView')">相関図</button>
+            <button class="btn" id="btnFrequencyChartsView" onclick="showView('frequencyChartsView')">N値頻度分布</button>
+            <button class="btn" id="btnSpecialValueChartView" onclick="showView('specialValueChartView')">特異値確認</button>
+            <button class="btn" id="btnStatisticsView" onclick="showView('statisticsView')">統計処理</button>
+            <button class="btn" id="btnLayerSummaryView" onclick="showView('layerSummaryView')">地層別総括</button>
+            <button class="btn" id="btnLayerArticlesView" onclick="showView('layerArticlesView')" style="background-color: #fff3e0; color: #d35400; border-bottom: 3px solid #e67e22;">📝地層記事</button>
+        </div>
+        <button class="help-button" onclick="openHelpModal()">?</button>
+    </header>
+
+    <aside class="sidebar-left">
+        <div class="sidebar-section">
+            <h2>📁 ファイル</h2>
+            <div class="sidebar-buttons-row">
+                <button class="btn btn-save" onclick="saveState()">
+                    <span style="font-size: 16px;">💾</span> 保存
+                </button>
+                <button class="btn btn-load" onclick="document.getElementById('loadStateInput').click()">
+                    <span style="font-size: 16px;">📂</span> 読込
+                </button>
+            </div>
+            <input type="file" id="loadStateInput" style="display:none" onchange="loadState(event)" accept=".json">
+        </div>
+
+        <div class="sidebar-section">
+            <h2>⚙️入力設定</h2>
+            <div class="settings-group">
+                <div class="standard-selector">
+                    <strong>🎛️計算基準:</strong>
+                    <div>
+                        <label><input type="radio" name="standard" value="civil" onchange="changeStandard()" checked> 土木</label>
+                        <label><input type="radio" name="standard" value="architectural" onchange="changeStandard()"> 建築</label>
+                    </div>
+                </div>
+                <div id="architecturalSettings">
+                    <strong>建築N値上限 (土質):</strong>
+                    <div>
+                        <label><input type="radio" name="arch_n_cap" value="100" onchange="changeArchitecturalNCap()" checked> 100</label>
+                        <label><input type="radio" name="arch_n_cap" value="60" onchange="changeArchitecturalNCap()"> 60</label>
+                    </div>
+                </div>
+                <div class="standard-selector">
+                    <strong>📜貫入量の記録:</strong>
+                    <div>
+                        <label><input type="radio" name="penetrationInterval" value="10cm" onchange="changePenetrationInterval()" checked> 10cm<br>間隔</label>
+                        <label><input type="radio" name="penetrationInterval" value="5cm" onchange="changePenetrationInterval()"> 5cm<br>間隔</label>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+      
+        <div class="sidebar-section">
+            <h2>📊孔番選択</h2>
+            <label for="boringSelector">孔番リスト <small>(複数選択可)</small></label>
+            <select id="boringSelector" onchange="updateSelectedBoringHoles()" multiple style="height: 200px;"></select>
+        </div>
+        <button class="btn btn-settings" onclick="openSettingsModal()">
+            <span style="font-size: 16px;">🖥️</span> 表示・出力設定
+        </button>
+
+    </aside>
+
+    <main class="main-content">
+        <div id="dataInputView" class="view-container"> <div class="data-input-container"> <div> <h2>試験データ</h2> <div id="dataGrid"></div> </div> <div> <button class="btn btn-primary" onclick="processData()" style="width: 100%; margin-bottom: 15px;">グラフ・計算結果に反映▶️</button> <h2 style="margin-bottom: 12px;">孔口標高</h2> <div id="elevationGrid"></div> </div> </div> </div>
+
+<div id="legendView" class="view-container">
+            <div class="legend-view-grid">
+                <div class="legend-box" id="bulk-style-importer">
+                    <div class="legend-box-header">
+                        <h3>凡例一括設定</h3>
+                        <div class="btn-group">
+                            <button class="btn btn-primary btn-sm" onclick="applyGridStyles()">凡例設定に反映▶️</button>
+                        </div>
+                    </div>
+                    <p style="font-size: 13px; margin-bottom: 10px; margin-top: 15px;">Excelからコピーしたデータをグリッドに貼り付けできます。<br>「連番」の順に凡例リストが並び替えられます。</p>
+                    <div id="styleGrid"></div>
+                </div>
+                
+<div class="legend-box">
+                    <div class="legend-box-header" style="align-items: flex-start;">
+                        <h3 style="margin-top: 5px;">凡例の順序・スタイル設定</h3>
+                        
+                        <div style="display: flex; flex-direction: column; gap: 6px;">
+                            
+                            <div class="btn-group" style="gap: 5px; justify-content: flex-end;">
+                                <button class="btn btn-sm" onclick="openSettingsModal('tabStandardColors')">⚙️標準色設定</button>
+                                <button class="btn btn-sm" onclick="applyStandardColors()" style="background:#fff3cd; border-color:#ffeeba;">🎨標準色適用</button>
+                            </div>
+
+                            <p style="font-size: 11px; margin: 0; text-align: right; color: #555; line-height: 1.3;">
+                                ドラッグ＆ドロップで表示順を変更できます。<br>
+                                チェックを外すとグラフ等から一時的に非表示になります。
+                            </p>
+
+                            <div class="btn-group" style="gap: 5px; justify-content: flex-start;">
+                                <button class="btn btn-sm" onclick="toggleAllStyles(true)" title="すべて表示">☑️ 全選択</button>
+                                <button class="btn btn-sm" onclick="toggleAllStyles(false)" title="すべて非表示">⬜ 全解除</button>
+                                <button class="btn btn-danger btn-sm" onclick="deleteUnusedStyles()">🗑️未使用削除</button>
+                            </div>
+                            
+                        </div>
+                    </div>
+                    
+                    <div id="styleSettingsContainer">
+                        <ul id="styleSettingsList"></ul>
+                    </div>
+                </div>
+
+                <div class="legend-box">
+                    <h3>設定の保存・読込</h3>
+                    <p style="font-size: 13px; margin-bottom: 10px; margin-top: 15px;">現在の凡例スタイルを保存・読込します。</p>
+                    <div class="settings-buttons">
+                        <button class="btn btn-save" onclick="saveSettings()">💾凡例設定保存</button>
+                        <button class="btn btn-load" onclick="document.getElementById('loadSettingsInput').click()">📂凡例設定読込</button>
+                        <input type="file" id="loadSettingsInput" style="display:none" onchange="loadSettings(event)" accept=".json">
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div id="tableView" class="view-container">
+            <div class="view-header">
+                <h2>計算結果一覧表</h2>
+                <div class="btn-group">
+                    <button class="btn btn-sm" onclick="openSettingsModal('tabCalcTable')">⚙️表示設定</button>
+                    <button class="btn" onclick="exportTableToCSV('dataTable', 'calculation_results.csv')">CSV</button>
+                    <button class="btn" onclick="exportTableToPNG('dataTable', 'calculation_results.png')">PNG</button>
+                    <button class="btn btn-primary" onclick="exportTableToPPTX('dataTable', 'calculation_results.pptx')">PPTX</button>
+                    <button class="btn" onclick="window.print()" style="background-color: #555; color: white;">🖨️ 印刷</button>
+                </div>
+            </div>
+            <div class="table-container">
+                <table id="dataTable"></table>
+            </div>
+        </div>
+        <div id="correctedNView" class="view-container">
+            <div class="view-header">
+                <h2>打撃貫入曲線と補正N値の算出</h2>
+                <div class="btn-group">
+                    <button class="btn btn-sm" onclick="openSettingsModal('tabCorrected')">⚙️グラフ設定</button>
+                    <button class="btn btn-primary" onclick="exportCorrectedNChartsToPPTX()">全グラフをPPTX出力</button>
+                    <button class="btn" onclick="window.print()" style="background-color: #555; color: white;">🖨️ 印刷</button>
+                </div>
+            </div>
+            <div id="correctedNChartsGrid"></div>
+        </div>
+        
+        <div id="correlationChartView" class="view-container">
+            <div class="view-header">
+                <h2 style="margin-bottom: 0;">相関図 <small>(グラフ上の点を右クリックで特異値を除外/復帰)</small></h2>
+                <div class="btn-group">
+                    <button class="btn btn-sm" onclick="openSettingsModal('tabCorrelation')">⚙️グラフ設定</button>
+                    <button class="btn btn-settings" onclick="openQuickLegendModal()" style="width: auto; margin-bottom: 0; font-size: 12px;">
+                        🛠️ 凡例設定(色・順序・区分)
+                    </button>
+                    <button class="btn btn-primary" onclick="exportCorrelationChartsToPPTX()">PPTX出力</button>
+                    <button class="btn" onclick="window.print()" style="background-color: #555; color: white;">🖨️ 印刷</button>
+                </div>
+            </div>
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px; margin-bottom: 15px;">
+                <div class="control-box-blue" style="justify-content: center;">
+                    <div class="axis-controls">
+                        <span>深度(m):</span>
+                        <input type="number" id="depthMin" placeholder="最小"> ～ <input type="number" id="depthMax" placeholder="最大">
+                    </div>
+                    <button class="btn" onclick="applyCorrelationChartRanges()">目盛適用</button>
+                </div>
+                <div class="control-box-blue" style="justify-content: center;">
+                    <div class="axis-controls">
+                        <span>標高(m):</span>
+                        <input type="number" id="elevMin" placeholder="最小"> ～ <input type="number" id="elevMax" placeholder="最大">
+                    </div>
+                    <button class="btn" onclick="applyCorrelationChartRanges()">目盛適用</button>
+                </div>
+            </div>
+            <div class="correlation-charts-grid">
+                <div class="chart-box"> <h2>N値-深度 (土質用)</h2> <button class="btn export-btn" onclick="exportChart('chartDepthSoil')">PNG</button> <div class="chart-wrapper" style="height: 450px;"> <canvas id="chartDepthSoil"></canvas> </div> </div>
+                <div class="chart-box"> <h2>N値-標高 (土質用)</h2> <button class="btn export-btn" onclick="exportChart('chartElevSoil')">PNG</button> <div class="chart-wrapper" style="height: 450px;"> <canvas id="chartElevSoil"></canvas> </div> </div>
+                <div class="chart-box"> <h2>N値-深度 (岩盤用)</h2> <button class="btn export-btn" onclick="exportChart('chartDepthRock')">PNG</button> <div class="chart-wrapper" style="height: 450px;"> <canvas id="chartDepthRock"></canvas> </div> </div>
+                <div class="chart-box"> <h2>N値-標高 (岩盤用)</h2> <button class="btn export-btn" onclick="exportChart('chartElevRock')">PNG</button> <div class="chart-wrapper" style="height: 450px;"> <canvas id="chartElevRock"></canvas> </div> </div>
+            </div>
+        </div>
+        
+        <div id="frequencyChartsView" class="view-container"> 
+            <div class="view-header"> 
+                <h2>土層ごとのN値頻度分布</h2> 
+                <div class="btn-group"> 
+                    <button class="btn btn-sm" onclick="openSettingsModal('tabFrequency')">⚙️グラフ設定</button>
+                    <button class="btn" onclick="exportFrequencyChartsGrid()">全グラフをPNG保存</button> 
+                    <button class="btn btn-primary" onclick="exportFrequencyChartsToPPTX()">全グラフをPPTX出力</button>
+                    <button class="btn" onclick="window.print()" style="background-color: #555; color: white;">🖨️ 印刷</button>
+                </div> 
+            </div> 
+            <div id="frequencyChartsGrid"></div> 
+        </div>
+        
+        <div id="specialValueChartView" class="view-container"> 
+            <div class="view-header"> 
+                <h2>特異値確認グラフ <small>(グラフ上の点を右クリックで特異値を除外/復帰)</small></h2> 
+                <div class="btn-group">
+                    <button class="btn btn-sm" onclick="openSettingsModal('tabSpecial')">⚙️グラフ設定</button>
+                    <button class="btn btn-primary" onclick="exportSpecialValueChartsToPPTX()">PPTX出力</button>
+                    <button class="btn" onclick="window.print()" style="background-color: #555; color: white;">🖨️ 印刷</button>
+                </div>
+            </div> 
+            <div class="chart-box" style="margin-bottom: 30px;"> <h2>土質用</h2> <button class="btn export-btn" onclick="exportChart('specialValueChartSoil')">PNG</button> <div class="chart-wrapper"><canvas id="specialValueChartSoil"></canvas></div> </div> <div class="chart-box"> <h2>岩盤用</h2> <button class="btn export-btn" onclick="exportChart('specialValueChartRock')">PNG</button> <div class="chart-wrapper"><canvas id="specialValueChartRock"></canvas></div> </div> 
+        </div>
+        
+        <div id="statisticsView" class="view-container">
+            <div class="view-header">
+                <h2>全データでの統計処理</h2>
+                <div class="btn-group">
+                    <button class="btn btn-sm" onclick="openSettingsModal('tabStatistics')">⚙️表示・端数設定</button>
+                    <button class="btn" onclick="exportTableToCSV('statisticsTableAll', 'statistics_all.csv')">CSV</button>
+                    <button class="btn" onclick="exportTableToPNG('statisticsTableAll', 'statistics_all.png')">PNG</button>
+                    <button class="btn btn-primary" onclick="exportTableToPPTX('statisticsTableAll', 'statistics_all.pptx')">PPTX</button>
+                    <button class="btn" onclick="window.print()" style="background-color: #555; color: white;">🖨️ 印刷</button>
+                </div>
+            </div>
+            <div class="control-box-blue">
+                <label for="representativeNMethod" style="font-weight: 600; font-size: 14px;">代表N値の算出方法:</label>
+                <select id="representativeNMethod" class="styled-select" onchange="renderAllForSelectedHoles()" style="width: auto; margin-bottom: 0;">
+                    <option value="auto_0.2">1. 変動係数 V ≦ 0.2 で判定 (標準)</option>
+                    <option value="auto_0.3">2. 変動係数 V ≦ 0.3 で判定</option>
+                    <option value="auto_0.4">3. 変動係数 V ≦ 0.4 で判定</option>
+                    <option value="mean_minus_sigma_div_2">4. 一律「平均N値 - σ/2」</option>
+                    <option value="mean">5. 一律「平均N値」</option>
+                </select>
+            </div>
+            <div class="table-container"> <table id="statisticsTableAll"></table> </div>
+            <div class="view-header" style="margin-top: 30px;">
+                <h2>特異値を除いた統計処理</h2>
+                <div class="btn-group">
+                    <button class="btn" onclick="exportTableToCSV('statisticsTableExcluded', 'statistics_excluded.csv')">CSV</button>
+                    <button class="btn" onclick="exportTableToPNG('statisticsTableExcluded', 'statistics_excluded.png')">PNG</button>
+                    <button class="btn btn-primary" onclick="exportTableToPPTX('statisticsTableExcluded', 'statistics_excluded.pptx')">PPTX</button>
+                    <button class="btn" onclick="window.print()" style="background-color: #555; color: white;">🖨️ 印刷</button>
+                </div>
+            </div>
+            <div class="table-container"> <table id="statisticsTableExcluded"></table> </div>
+        </div>
+        
+        <div id="layerSummaryView" class="view-container">
+            <div class="view-header">
+                <h2>地層別総括</h2>
+                <div class="btn-group">
+                    <button class="btn btn-sm" onclick="openSettingsModal('tabSummary')">⚙️総括図設定</button>
+                    <button class="btn btn-primary" onclick="exportAllLayersSummaryToPPTX()" style="background-color: #6f42c1; border-color: #6f42c1;">📚 全土層を一括PPTX出力</button>
+                    <button class="btn btn-primary" onclick="exportSummaryToPPTX()">現在の表示をPPTX出力</button>
+                    <button class="btn" onclick="window.print()" style="background-color: #555; color: white;">🖨️ 印刷</button>
+                </div>
+            </div>
+            <div class="control-box-blue">
+                <label for="layerSelector" style="font-weight: 600;">総括図に整理する地層を選択:</label>
+                <select id="layerSelector" class="styled-select" onchange="renderLayerSummaryView()" style="width: 200px; margin-bottom:0;"></select>
+            </div>
+
+            <div id="summaryContent" style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin-top: 20px;">
+                <div id="summaryStatisticsContainer" class="chart-box" style="grid-column: 1 / 3;">
+                    <h3>統計処理結果</h3>
+                    <div class="table-container"> <table id="summaryStatisticsTable"></table> </div>
+                </div>
+                <div id="summaryCorrelationContainer" class="chart-box" style="grid-column: 1 / 3;">
+                    <h3>相関図</h3>
+                    <div style="display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 25px; padding-top: 10px;">
+                        <div class="chart-wrapper" style="height: 600px; position: relative;"> 
+                            <h4 style="text-align: center;">N値-深度</h4> <canvas id="summaryDepthChart"></canvas> 
+                        </div>
+                        <div class="chart-wrapper" style="height: 600px; position: relative;"> 
+                            <h4 style="text-align: center;">N値-標高</h4> <canvas id="summaryElevChart"></canvas> 
+                        </div>
+                    </div>
+                </div>
+                <div id="summaryVisualsContainer" class="chart-box" style="grid-column: 1 / 3;">
+                    <h3>N値分布の可視化</h3>
+                    <div style="display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 25px; padding-top: 10px;">
+                        <div id="summarySpecialValueWrapper" class="chart-wrapper" style="height: 350px; position: relative;"> 
+                            <h4 style="text-align: center;">特異値確認</h4> <canvas id="summarySpecialValueChart"></canvas> 
+                        </div>
+                        <div id="summaryFrequencyWrapper" class="chart-wrapper" style="height: 350px; position: relative;"> 
+                            <h4 style="text-align: center;">N値頻度分布</h4> <canvas id="summaryFrequencyChart"></canvas> 
+                        </div>
+                    </div>
+                </div>
+                <div id="summaryTableContainer" class="chart-box" style="grid-column: 1 / 3;">
+                    <h3>計算結果データ一覧</h3>
+                    <div class="table-container"> <table id="summaryDataTable"></table> </div>
+                </div>
+            </div>
+        </div>
+
+        <div id="layerArticlesView" class="view-container">
+            <div class="view-header">
+                <h2>📝 地層記事（全層一括生成）</h2>
+                <div class="btn-group">
+                    <button class="btn btn-sm" onclick="openLayerArticleSettingsModal()">⚙️ 構成設定</button>
+                    <button class="btn btn-primary" onclick="generateAllLayerArticles()">🔄 記事を再生成する</button>
+<button class="btn" onclick="exportArticlesToWord()" style="background-color: #2b579a; color: white;">📄 Word出力</button>
+<button class="btn" onclick="window.print()">🖨️ 印刷</button>
+                </div>
+            </div>
+            <div style="background:#fff3e0; padding:15px; border-radius:8px; margin-bottom:20px; border:1px solid #ffe0b2;">
+                <p style="margin:0; font-size:14px;">選択中の孔番に含まれる全ての地層について、統計値と傾向分析に基づいた記事（所見案）を生成します。<br>
+                ※「凡例」設定で「土質区分」や「地質時代」を設定すると、より正確な文章になります。</p>
+            </div>
+            <div id="articlesContainer"></div>
+        </div>
+
+    </main>
+  </div>
+  
+  <ul id="customContextMenu"> <li id="contextMenuExclude">特異値として除外</li> <li id="contextMenuInclude">統計処理に復帰</li> </ul>
+
+<div id="helpModal" class="modal">
+    <div class="modal-content">
+        <span class="close-button" onclick="closeHelpModal()">&times;</span>
+        <h2 style="border-bottom: 2px solid #2563eb; padding-bottom: 10px; margin-bottom: 20px;">ヘルプ・使い方ガイド</h2>
+        <p>このシステムは、標準貫入試験のデータを入力し、各種グラフ作成や統計計算を自動で行う支援ツールです。</p>
+        <p><b>NEW: 「地層記事」タブ</b><br>N値の傾向分析（深度方向の増減）や均質性（ばらつき）を評価し、工学的所見を含めた記事案を全層一括で生成します。</p>
+    </div>
+  </div>
+
+<footer style="font-size: 12px; text-align: center; padding: 20px; color: #6c757d; background-color: #f8f9fa; border-top: 1px solid #e9ecef; margin-top: 10px;">
+    <div style="display: flex; justify-content: center; align-items: center; gap: 2em; margin-bottom: 10px;">
+        <p id="lastUpdated" style="margin: 0;"></p>
+        <div id="legal-toggle" style="cursor: pointer; font-weight: bold; padding: 5px; color: #495057;">
+            免責事項 (クリックで表示)
+        </div>
+    </div>
+    <div id="legal-details" style="display: none; margin-top: 10px; border-top: 1px solid #e9ecef; padding-top: 10px; text-align: left; max-width: 800px; margin-left: auto; margin-right: auto; line-height: 1.6;">
+        <p style="text-align: center; font-weight: bold;">
+          Copyright &copy; 2025 (株)地圏総合コンサルタント All Rights Reserved.
+        </p>
+        <p style="font-size: 11px; color: #6c757d; text-align: center;">
+          Developed by: Naoya.Onozato
+        </p>
+        <p style="color: #d9534f; font-weight: bold; text-align: center; background-color: #fff3cd; padding: 5px; border: 1px solid #ffc107; border-radius: 4px; margin: 15px 0;">
+          ⚠ 本システムの再配布・第三者への提供を禁止します。
+        </p>
+        <p>
+          <strong>免責事項:</strong> 本システムの利用によって生じたいかなる損害についても、作成者は一切の責任を負いません。本ツールはあくまで補助的なものであり、計算結果は必ず専門技術者が確認・検証した上で使用してください。本システムが出力する値の正確性や完全性を保証するものではありません。
+        </p>
+        <p>
+          <strong>使用ライブラリ:</strong> 本サービスは以下のオープンソースライブラリを使用しています:<br>
+          - <a href="https://chartjs.org/" target="_blank">Chart.js</a>,
+          - <a href="https://handsontable.com/" target="_blank">Handsontable</a>,
+          - <a href="https://github.com/chartjs/chartjs-plugin-datalabels" target="_blank">chartjs-plugin-datalabels</a>,
+          - <a href="https://github.com/niklasvh/html2canvas" target="_blank">html2canvas</a>,
+          - <a href="https://github.com/gitbrent/pptxgenjs" target="_blank">PptxGenJS</a>,
+          - <a href="https://github.com/chartjs/chartjs-plugin-annotation" target="_blank">chartjs-plugin-annotation</a>
+        </p>
+    </div>
+</footer>
+
+  <div id="settingsModal" class="modal">
+    <div class="modal-content">
+        <span class="close-button" onclick="cancelSettings()">&times;</span>
+        <h3>⚙️全体設定【表示・出力設定】</h3>
+        <div class="settings-tabs">
+            <div id="tabGeneralBtn" class="settings-tab active" onclick="openSettingsTab('tabGeneral')">一般・出力</div>
+            <div id="tabStandardColorsBtn" class="settings-tab" onclick="openSettingsTab('tabStandardColors')">標準色設定</div>
+            <div id="tabCalcTableBtn" class="settings-tab" onclick="openSettingsTab('tabCalcTable')">計算結果一覧</div>
+            <div id="tabCorrectedBtn" class="settings-tab" onclick="openSettingsTab('tabCorrected')">補正N値</div>
+            <div id="tabCorrelationBtn" class="settings-tab" onclick="openSettingsTab('tabCorrelation')">相関図</div>
+            <div id="tabFrequencyBtn" class="settings-tab" onclick="openSettingsTab('tabFrequency')">N値頻度分布</div>
+            <div id="tabSpecialBtn" class="settings-tab" onclick="openSettingsTab('tabSpecial')">特異値確認</div>
+            <div id="tabStatisticsBtn" class="settings-tab" onclick="openSettingsTab('tabStatistics')">統計処理</div>
+            <div id="tabSummaryBtn" class="settings-tab" onclick="openSettingsTab('tabSummary')">地層別総括</div>
+        </div>
+        <div id="tabGeneral" class="settings-content active">
+            <h4>画像出力・全般設定</h4>
+            <div class="settings-section">
+                <div class="settings-item"><label>🖼️PNG画質</label><select id="exportQualitySelector" onchange="previewSettings()"><option value="1">標準</option><option value="2" selected>高画質 (2倍)</option><option value="3">最高画質 (3倍)</option></select></div>
+                <div class="settings-item"><label>ℹ️補正N値,頻度分布図レイアウト</label><select id="freqLayoutSelector" onchange="previewSettings()"><option value="3x2">3x2</option><option value="4x3">4x3</option><option value="3x_all">一括</option></select></div>
+                <div class="settings-item"><label>🔀フォント</label><select id="fontSelector" onchange="previewSettings()"><option value="sans-serif">標準</option><option value="Arial, sans-serif">Arial</option><option value="'Times New Roman', serif">Times</option><option value="'MS Gothic', monospace">MSゴシック</option></select></div>
+            </div>
+        </div>
+        <div id="tabStandardColors" class="settings-content">
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px;">
+                <div><h4>土質</h4><div id="stdColorListSoil" style="max-height: 400px; overflow-y: auto;"></div><button class="btn btn-sm" onclick="addStdColorRow('soil')">＋ 追加</button></div>
+                <div><h4>岩盤</h4><div id="stdColorListRock" style="max-height: 400px; overflow-y: auto;"></div><button class="btn btn-sm" onclick="addStdColorRow('rock')">＋ 追加</button></div>
+            </div>
+        </div>
+        <div id="tabCalcTable" class="settings-content"><h4>計算結果表</h4><div class="slider-row"><label>フォント</label><input type="range" id="rangeTableCalcFontSize" min="8" max="30" oninput="syncSlider('rangeTableCalcFontSize','setTableCalcFontSize')"><input type="number" id="setTableCalcFontSize"></div></div>
+        <div id="tabCorrected" class="settings-content"><h4>補正N値</h4><div class="slider-row"><label>フォント</label><input type="range" id="rangeChartCorrectedFontSize" min="8" max="30" oninput="syncSlider('rangeChartCorrectedFontSize','setChartCorrectedFontSize')"><input type="number" id="setChartCorrectedFontSize"></div></div>
+        <div id="tabCorrelation" class="settings-content"><h4>相関図</h4><div class="slider-row"><label>フォント</label><input type="range" id="rangeChartCorrelationFontSize" min="8" max="30" oninput="syncSlider('rangeChartCorrelationFontSize','setChartCorrelationFontSize')"><input type="number" id="setChartCorrelationFontSize"></div><div class="slider-row"><label>マーカー</label><input type="range" id="rangeChartCorrelationMarkerSize" min="2" max="20" oninput="syncSlider('rangeChartCorrelationMarkerSize','setChartCorrelationMarkerSize')"><input type="number" id="setChartCorrelationMarkerSize"></div></div>
+        <div id="tabFrequency" class="settings-content"><h4>頻度分布</h4><div class="slider-row"><label>フォント</label><input type="range" id="rangeChartFreqFontSize" min="8" max="30" oninput="syncSlider('rangeChartFreqFontSize','setChartFreqFontSize')"><input type="number" id="setChartFreqFontSize"></div><div class="settings-item"><label>目盛間隔</label><select id="setChartFreqStepSize" onchange="previewSettings()"><option value="5">5</option><option value="10">10</option></select></div></div>
+       
+
+<!-- ▼▼▼ ここからコピーして貼り付け（上書き） ▼▼▼ -->
+<div id="tabSpecial" class="settings-content">
+    <h4>特異値確認グラフ設定</h4>
+    <div class="slider-row">
+        <label>フォント</label>
+        <input type="range" id="rangeChartSpecialFontSize" min="8" max="30" oninput="syncSlider('rangeChartSpecialFontSize','setChartSpecialFontSize')">
+        <input type="number" id="setChartSpecialFontSize">
+    </div>
+    <div class="slider-row">
+        <label>N値サイズ</label>
+        <input type="range" id="rangeChartSpecialMarkerSizeN" min="2" max="20" oninput="syncSlider('rangeChartSpecialMarkerSizeN','setChartSpecialMarkerSizeN')">
+        <input type="number" id="setChartSpecialMarkerSizeN">
+    </div>
+    <div class="slider-row">
+        <label>平均N値サイズ</label>
+        <input type="range" id="rangeChartSpecialMarkerSizeMean" min="2" max="20" oninput="syncSlider('rangeChartSpecialMarkerSizeMean','setChartSpecialMarkerSizeMean')">
+        <input type="number" id="setChartSpecialMarkerSizeMean">
+    </div>
+    <div class="slider-row">
+        <label>代表N値サイズ</label>
+        <input type="range" id="rangeChartSpecialMarkerSizeRep" min="2" max="20" oninput="syncSlider('rangeChartSpecialMarkerSizeRep','setChartSpecialMarkerSizeRep')">
+        <input type="number" id="setChartSpecialMarkerSizeRep">
+    </div>
+    <div class="slider-row">
+        <label>特異値サイズ</label>
+        <input type="range" id="rangeChartSpecialMarkerSizeOutlier" min="2" max="20" oninput="syncSlider('rangeChartSpecialMarkerSizeOutlier','setChartSpecialMarkerSizeOutlier')">
+        <input type="number" id="setChartSpecialMarkerSizeOutlier">
+    </div>
+</div>
+<!-- ▲▲▲ ここまで ▲▲▲ -->
+
+
+        <div id="tabStatistics" class="settings-content"><h4>統計表</h4><div class="slider-row"><label>フォント</label><input type="range" id="rangeTableStatsFontSize" min="8" max="30" oninput="syncSlider('rangeTableStatsFontSize','setTableStatsFontSize')"><input type="number" id="setTableStatsFontSize"></div><h4>端数処理</h4><div class="settings-item">
+            <!-- ▼▼▼ 修正箇所: onchangeイベントを追加 ▼▼▼ -->
+            <select id="setStatsRoundingMethod" onchange="previewSettings()"><option value="dec2">小数第2位</option><option value="int_floor">整数切捨</option><option value="int_round">整数四捨五入</option><option value="dec1_floor">小数1位切捨</option><option value="dec1_round">小数1位四捨五入</option></select>
+            <!-- ▲▲▲ -->
+        </div></div>
+        <div id="tabSummary" class="settings-content"><h4>総括図</h4><div class="slider-row"><label>統計表フォント</label><input type="range" id="rangeSummaryStatsTableFontSize" min="8" max="30" oninput="syncSlider('rangeSummaryStatsTableFontSize','setSummaryStatsTableFontSize')"><input type="number" id="setSummaryStatsTableFontSize"></div><div class="slider-row"><label>データ表フォント</label><input type="range" id="rangeSummaryDataTableFontSize" min="8" max="30" oninput="syncSlider('rangeSummaryDataTableFontSize','setSummaryDataTableFontSize')"><input type="number" id="setSummaryDataTableFontSize"></div><div class="slider-row"><label>相関図フォント</label><input type="range" id="rangeSummaryCorrelationFontSize" min="8" max="30" oninput="syncSlider('rangeSummaryCorrelationFontSize','setSummaryCorrelationFontSize')"><input type="number" id="setSummaryCorrelationFontSize"></div><div class="slider-row"><label>相関図マーカー</label><input type="range" id="rangeSummaryCorrelationMarkerSize" min="2" max="20" oninput="syncSlider('rangeSummaryCorrelationMarkerSize','setSummaryCorrelationMarkerSize')"><input type="number" id="setSummaryCorrelationMarkerSize"></div><div class="slider-row"><label>特異値フォント</label><input type="range" id="rangeSummarySpecialFontSize" min="8" max="30" oninput="syncSlider('rangeSummarySpecialFontSize','setSummarySpecialFontSize')"><input type="number" id="setSummarySpecialFontSize"></div><div class="slider-row"><label>特異値マーカー</label><input type="range" id="rangeSummarySpecialMarkerSize" min="2" max="20" oninput="syncSlider('rangeSummarySpecialMarkerSize','setSummarySpecialMarkerSize')"><input type="number" id="setSummarySpecialMarkerSize"></div><div class="slider-row"><label>頻度フォント</label><input type="range" id="rangeSummaryFreqFontSize" min="8" max="30" oninput="syncSlider('rangeSummaryFreqFontSize','setSummaryFreqFontSize')"><input type="number" id="setSummaryFreqFontSize"></div></div>
+
+        <div style="text-align: right; margin-top: 20px; padding-top: 10px; border-top: 1px solid #eee;">
+            <button class="btn" onclick="cancelSettings()">キャンセル</button>
+            <button class="btn btn-primary" onclick="applyGlobalSettings()">適用して閉じる</button>
+        </div>
+    </div>
+  </div>
+  
+  <div id="quickLegendModal" class="modal">
+        <div class="modal-content">
+            <span class="close-button" onclick="closeQuickLegendModal()">&times;</span>
+            <h3>🛠️ 凡例設定 (色・形状・順序・区分)</h3>
+            <p style="font-size: 13px;">ドラッグ&ドロップで順序変更、色変更が即座に反映されます。<br>※ここで設定した「土質区分」は地層別総括の記事自動生成に利用されます。</p>
+            <div style="background: #f8f9fa; padding: 10px; border-radius: 5px; border: 1px solid #ddd;">
+                 <ul id="quickLegendList"></ul>
+            </div>
+            <div style="text-align: right; margin-top: 15px;">
+                <button class="btn btn-primary" onclick="closeQuickLegendModal()">閉じる (グラフ更新)</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="layerArticleSettingsModal" class="modal">
+        <div class="modal-content" style="max-width: 900px;">
+            <span class="close-button" onclick="closeLayerArticleSettingsModal()">&times;</span>
+            <h3>⚙️ 地層記事 構成詳細設定</h3>
+            <p style="font-size:13px;">各地層の記事に含める項目を選択してください。ヘッダーのチェックボックスで列ごとの一括操作が可能です。</p>
+            
+            <div class="table-container" style="max-height: 500px; overflow-y: auto; margin-bottom: 20px;">
+                <table id="layerArticleSettingsTable" style="width: 100%; border-collapse: collapse; text-align: center;">
+                    <thead style="background: #f1f5f9; position: sticky; top: 0; z-index: 10;">
+                        <tr>
+                            <th style="padding: 8px;">地層記号</th>
+                            <th><label><input type="checkbox" onchange="toggleArticleColumn('depth', this.checked)" checked> 深度・層厚</label></th>
+                            <th><label><input type="checkbox" onchange="toggleArticleColumn('age', this.checked)" checked> 時代・区分</label></th>
+                            <th><label><input type="checkbox" onchange="toggleArticleColumn('n_stats', this.checked)" checked> N値統計</label></th>
+                            <th><label><input type="checkbox" onchange="toggleArticleColumn('state', this.checked)" checked> 状態記述</label></th>
+                            <th><label><input type="checkbox" onchange="toggleArticleColumn('trend', this.checked)" checked> 傾向・均質</label></th>
+                            <th><label><input type="checkbox" onchange="toggleArticleColumn('notes', this.checked)" checked> 特記事項</label></th>
+                        </tr>
+                    </thead>
+                    <tbody></tbody>
+                </table>
+            </div>
+
+            <div style="text-align: right; border-top: 1px solid #eee; padding-top: 15px;">
+                <button class="btn" onclick="closeLayerArticleSettingsModal()">キャンセル</button>
+                <button class="btn btn-primary" onclick="applyLayerArticleSettings()">設定を適用して再生成</button>
+            </div>
+        </div>
+    </div>
+
+<script>
+    // --- Global Variables ---
+    let allBoringData = {}, selectedBoringHoles = [];
+    let chartInstances = {};
+    let soilStyleSettings = {};
+    let calculationStandard = 'civil';
+    let architecturalSoilNCap = 100;
+    let hiddenSymbols = new Set();
+    let penetrationInterval = '10cm';
+    let excludedPoints = new Set();
+    let correctedNValues = {}; 
+    let correctionState = { isSelecting: false, testDataId: null, lineIndex: null, startPoint: null };
+    let contextTargetItem = null;
+    let viewDirtyState = { correlationChartView: true, frequencyChartsView: true, specialValueChartView: true, statisticsView: true, correctedNView: true, layerSummaryView: true, tableView: true, layerArticlesView: true };
+    let currentActiveView = 'dataInputView';
+    let currentStatsData = []; 
+    let layerArticleSettings = {}; 
+    
+    const defaultMarkers = ['circle', 'rect', 'triangle', 'rectRot', 'rectRounded'];
+    const markerNameMapJP = { 'circle': ' ● (円)', 'rect': ' ■ (四角)', 'triangle': ' ▲ (三角)', 'rectRot': ' ◆ (ひし形)', 'rectRounded': ' ▰ (角丸四角)' };
+    let hot_data, hot_elev, hot_style;
+    const EXPORT_FONT_FAMILY = '"Meiryo", "Yu Gothic", "Hiragino Kaku Gothic ProN", "Hiragino Sans", sans-serif';
+
+    const SOIL_CLASSIFICATIONS = {
+        'clay': '粘性土', 'sand': '砂質土', 'gravel': '礫質土', 'volcanic': '火山灰質土',
+        'organic': '有機質土',
+        'rock_soft': '軟岩', 'rock_medium': '中硬岩', 'rock_hard': '硬岩', 'unknown': '指定なし'
+    };
+    const GEO_AGES = {
+        'fill': '盛土', 'alluvial': '沖積層', 'diluvial': '洪積層', 'tertiary': '第三紀層', 'pre_tertiary': '先第三紀', 'unknown': ''
+    };
+    const JGS_CRITERIA = {
+        sand: [ { max: 4, label: '非常に緩い' }, { max: 10, label: '緩い' }, { max: 30, label: '中位の' }, { max: 50, label: '密な' }, { max: Infinity, label: '非常に密な' } ],
+        clay: [ { max: 2, label: '非常に柔らかい' }, { max: 4, label: '柔らかい' }, { max: 8, label: '中位の' }, { max: 15, label: '硬い' }, { max: 30, label: '非常に硬い' }, { max: Infinity, label: '固結した' } ],
+        organic: [ { max: 2, label: '非常に柔らかい' }, { max: 4, label: '柔らかい' }, { max: Infinity, label: '比較的安定しているが軟弱' } ]
+    };
+
+    const gridSettings = { 
+        '10cm': { columns: [ { data: 'boring_hole' }, { data: 'depth_start', type: 'numeric', numericFormat: { pattern: '0.00' } }, { data: 'depth_end', type: 'numeric', numericFormat: { pattern: '0.00' } }, { data: 'count10', type: 'numeric' }, { data: 'pen10', type: 'numeric' }, { data: 'count20', type: 'numeric' }, { data: 'pen20', type: 'numeric' }, { data: 'count30', type: 'numeric' }, { data: 'pen30', type: 'numeric' }, { data: 'soil_type' }, { data: 'rock_type' }, { data: 'soil_symbol' }, { data: 'rock_symbol' } ], colHeaders: [ '孔番', '開始深度(m)', '終了深度(m)', '10cm回数', '10cm貫入', '20cm回数', '20cm貫入', '30cm回数', '30cm貫入', '土質区分', '岩盤区分', '土層記号', '岩層記号' ] }, 
+        '5cm': { columns: [ { data: 'boring_hole' }, { data: 'depth_start', type: 'numeric' }, { data: 'depth_end', type: 'numeric' }, { data: 'count5', type: 'numeric' }, { data: 'pen5', type: 'numeric' }, { data: 'count10', type: 'numeric' }, { data: 'pen10', type: 'numeric' }, { data: 'count15', type: 'numeric' }, { data: 'pen15', type: 'numeric' }, { data: 'count20', type: 'numeric' }, { data: 'pen20', type: 'numeric' }, { data: 'count25', type: 'numeric' }, { data: 'pen25', type: 'numeric' }, { data: 'count30', type: 'numeric' }, { data: 'pen30', type: 'numeric' }, { data: 'soil_type' }, { data: 'rock_type' }, { data: 'soil_symbol' }, { data: 'rock_symbol' } ], colHeaders: [ '孔番', '開始(m)', '終了(m)', '5回', '5貫', '10回', '10貫', '15回', '15貫', '20回', '20貫', '25回', '25貫', '30回', '30貫', '土質', '岩盤', '土層', '岩層' ] } 
+    };
+    
+    const FREQUENCY_BINS = { civil_soil: [ { label: '0～4', min: 0, max: 4 }, { label: '5～9', min: 5, max: 9 }, { label: '10～14', min: 10, max: 14 }, { label: '15～19', min: 15, max: 19 }, { label: '20～24', min: 20, max: 24 }, { label: '25～29', min: 25, max: 29 }, { label: '30～34', min: 30, max: 34 }, { label: '35～39', min: 35, max: 39 }, { label: '40～44', min: 40, max: 44 }, { label: '45～49', min: 45, max: 49 }, { label: '50～', min: 50, max: Infinity } ], civil_rock: [ { label: '0～9', min: 0, max: 9 }, { label: '10～19', min: 10, max: 19 }, { label: '20～29', min: 20, max: 29 }, { label: '30～39', min: 30, max: 39 }, { label: '40～49', min: 40, max: 49 }, { label: '50～74', min: 50, max: 74 }, { label: '75～99', min: 75, max: 99 }, { label: '100～149', min: 100, max: 149 }, { label: '150～199', min: 150, max: 199 }, { label: '200～299', min: 200, max: 299 }, { label: '300～', min: 300, max: Infinity } ], architectural_soil: [ { label: '0～9', min: 0, max: 9 }, { label: '10～19', min: 10, max: 19 }, { label: '20～29', min: 20, max: 29 }, { label: '30～39', min: 30, max: 39 }, { label: '40～49', min: 40, max: 49 }, { label: '50～59', min: 50, max: 59 }, { label: '60～69', min: 60, max: 69 }, { label: '70～79', min: 70, max: 79 }, { label: '80～89', min: 80, max: 89 }, { label: '90～99', min: 90, max: 99 }, { label: '100～', min: 100, max: Infinity } ], architectural_rock: [ { label: '0～9', min: 0, max: 9 }, { label: '10～19', min: 10, max: 19 }, { label: '20～29', min: 20, max: 29 }, { label: '30～39', min: 30, max: 39 }, { label: '40～49', min: 40, max: 49 }, { label: '50～74', min: 50, max: 74 }, { label: '75～99', min: 75, max: 99 }, { label: '100～149', min: 100, max: 149 }, { label: '150～199', min: 150, max: 199 }, { label: '200～299', min: 200, max: 299 }, { label: '300～', min: 300, max: Infinity } ] };
+
+    const APP_CONSTANTS = { N_CAP: { CIVIL_SOIL: 50, ARCH_SOIL_LOW: 60, ARCH_SOIL_HIGH: 100, ROCK: 300 }, CALC: { FACTOR: 30, PENETRATION_LIMIT: 30 }, THRESHOLDS: { VARIATION_COEFF: 0.2 } };
+    const sampleData = [ { boring_hole: 'R5-No.1', depth_start: 1.15, depth_end: 1.45, count10: 1, pen10: 15, soil_type: '盛土', soil_symbol: 'Bc1' }, { boring_hole: 'R5-No.1', depth_start: 3.15, depth_end: 3.45, count10: 3, pen10: 10, count20: 5, pen20: 10, count30: 4, pen30: 10, soil_type: '礫混じりシルト', soil_symbol: 'Ac1' }, { boring_hole: 'R5-No.1', depth_start: 18.15, depth_end: 18.45, count10: 50, pen10: 5, rock_type: '泥岩', rock_symbol: 'Ms2' }, { boring_hole: 'R5-No.2', depth_start: 1.5, depth_end: 1.8, count10: 2, pen10: 15, soil_type: '埋土', soil_symbol: 'B' }, { boring_hole: 'R5-No.2', depth_start: 5.5, depth_end: 5.85, count10: 50, pen10: 15, rock_type: '砂岩', rock_symbol: 'Ss1' }, { boring_hole: 'R5-No.2', depth_start: 12.5, depth_end: 12.6, count10: 50, pen10: 10, count20: 50, pen20: 0, rock_type: '砂岩(硬質)', rock_symbol: 'Ss2' }];
+    const sampleElevations = [ { boring_hole: 'R5-No.1', elevation: 55.4 }, { boring_hole: 'R5-No.2', elevation: 58.2 } ];
+    const sampleStyles = [ { seq: 1, symbol: 'Bc2', r: 209, g: 175, b: 117 }, { seq: 2, symbol: 'Bs2', r: 238, g: 188, b: 145 }, { seq: 3, symbol: 'Bc1', r: 217, g: 189, b: 140 }, { seq: 4, symbol: 'As1', r: 247, g: 252, b: 161 }, { seq: 5, symbol: 'Ac1', r: 108, g: 249, b: 249 } ];
+
+    let appGlobalSettings = { general: { exportQuality: 2, fontFamily: "sans-serif", freqLayout: '3x2' }, standardColors: { soil: [ { key: 'B', color: '#D3D3D3' }, { key: 'O', color: '#808000' }, { key: 'L', color: '#CD853F' }, { key: 'C', color: '#87CEFA' }, { key: 'M', color: '#90EE90' }, { key: 'S', color: '#FFFF99' }, { key: 'G', color: '#C0C0C0' }, { key: 'V', color: '#646464' } ], rock: [ { key: 'R', color: '#FFA07A' }, { key: 'P', color: '#FFA07A' } ] }, tables: { calcFontSize: 13, statsFontSize: 14 }, // ▼▼▼ chartsブロックの中身を書き換え ▼▼▼
+    charts: { 
+        correctedFontSize: 12, 
+        correlationFontSize: 16, 
+        correlationMarkerSize: 6, 
+        freqFontSize: 14, 
+        freqStepSize: 5, 
+        specialFontSize: 16, 
+        // ↓ここから新しい設定を追加
+        specialMarkerSizeN: 6,      // N値（黒四角）
+        specialMarkerSizeMean: 5,   // 平均N値（赤丸）
+        specialMarkerSizeRep: 10,   // 代表N値（緑三角）
+        specialMarkerSizeOutlier: 10 // 特異値（透明丸）
+},
+// ▲▲▲ 書き換えここまで ▲▲▲
+summary: { statsTableFontSize: 18, dataTableFontSize: 16, correlationFontSize: 18, correlationMarkerSize: 7, specialFontSize: 18, specialMarkerSize: 6, freqFontSize: 16 }, statistics: { roundingMethod: 'dec2' } };
+    let settingsBackup = null;
+
+    function createManagedChart(canvasId, config, instanceKey = null) { const key = instanceKey || canvasId; if (chartInstances[key]) { chartInstances[key].destroy(); delete chartInstances[key]; } const canvas = document.getElementById(canvasId); if (!canvas) return null; const ctx = canvas.getContext('2d'); const chart = new Chart(ctx, config); chartInstances[key] = chart; return chart; }
+    function syncSlider(sourceId, targetId) { const source = document.getElementById(sourceId); const target = document.getElementById(targetId); if(source && target) { target.value = source.value; previewSettings(); } }
+    function findStandardColor(symbol) { if (!symbol) return null; const uSymbol = symbol.toUpperCase(); const allRules = [...(appGlobalSettings.standardColors.soil || []), ...(appGlobalSettings.standardColors.rock || [])]; for (const rule of allRules) { if (rule.key && uSymbol.includes(rule.key.toUpperCase())) return rule.color; } return null; }
+    function getOrCreateSoilStyle(symbol, name = '') { if (!soilStyleSettings[symbol]) { const stdColor = findStandardColor(symbol); soilStyleSettings[symbol] = { color: stdColor || getRandomColor(), marker: defaultMarkers[Object.keys(soilStyleSettings).length % defaultMarkers.length], order: Object.keys(soilStyleSettings).length + 1, name: name || symbol, classification: 'unknown', geoAge: 'unknown' }; } return soilStyleSettings[symbol]; }
+    function getRoundedRepresentativeN(value) { if (value === null || isNaN(value)) return value; const method = (appGlobalSettings.statistics && appGlobalSettings.statistics.roundingMethod) ? appGlobalSettings.statistics.roundingMethod : 'dec2'; let result = value; switch (method) { case 'int_floor': return Math.floor(value).toFixed(0); case 'int_round': return Math.round(value).toFixed(0); case 'dec1_floor': return (Math.floor(value * 10) / 10).toFixed(1); case 'dec1_round': return (Math.round(value * 10) / 10).toFixed(1); case 'dec2': default: return value.toFixed(2); } }
+
+    function getJGSDescription(nValue, classification) {
+        if (nValue === null || isNaN(nValue)) return '';
+        let criteria = classification === 'clay' ? JGS_CRITERIA.clay : (classification === 'organic' ? JGS_CRITERIA.organic : JGS_CRITERIA.sand);
+        if (classification === 'unknown') { 
+            if (nValue < 4) return '非常に緩い（軟らかい）';
+            if (nValue < 10) return '緩い（比較的軟らかい）';
+            if (nValue < 30) return '中位の締まり';
+            return '密な（硬い）';
+        }
+        for (let c of criteria) { if (nValue < c.max) return c.label; }
+        return criteria[criteria.length - 1].label;
+    }
+
+    function calculateSlope(depths, nValues) {
+        const n = depths.length; if (n < 2) return 0;
+        const sumX = depths.reduce((a, b) => a + b, 0);
+        const sumY = nValues.reduce((a, b) => a + b, 0);
+        const sumXY = depths.reduce((a, b, i) => a + b * nValues[i], 0);
+        const sumXX = depths.reduce((a, b) => a + b * b, 0);
+        return (n * sumXY - sumX * sumY) / (n * sumXX - sumX * sumX);
+    }
+
+    function generateAdvancedArticle(symbol, data, options) {
+        const opts = options || { depth: true, age: true, n_stats: true, state: true, trend: true, notes: true };
+        if (!data || data.length === 0) return "データがありません。";
+        const settings = soilStyleSettings[symbol] || {};
+        const ageKey = settings.geoAge || 'unknown';
+        const classKey = settings.classification || 'unknown'; 
+        const depths = data.map(d => d.depth_start).concat(data.map(d => d.depth_end));
+        const minDepth = Math.min(...depths).toFixed(2);
+        const maxDepth = Math.max(...depths).toFixed(2);
+        const thickness = (Math.max(...depths) - Math.min(...depths)).toFixed(1);
+        let nVals = [];
+        let selfSinkingCount = 0;
+        data.forEach(d => {
+            const n_hits = d.isCorrectedValue ? d.correctedNValue : getTotalN(d);
+            const pen = d.isCorrectedValue ? APP_CONSTANTS.CALC.PENETRATION_LIMIT : getTotalPenetration(d);
+            const isRock = (d.rock_symbol || d.rock_type);
+            const limit = isRock ? 300 : (calculationStandard === 'civil' ? 50 : architecturalSoilNCap);
+            const val = Math.min(calculateConvertedN(n_hits, pen), limit);
+            if(!isNaN(val)) nVals.push(val);
+            if (getTotalN(d) === 0 && getTotalPenetration(d) > 0) selfSinkingCount++;
+        });
+        if (nVals.length === 0) return "有効なN値データがありません。";
+        const minN = Math.min(...nVals).toFixed(1);
+        const maxN = Math.max(...nVals).toFixed(1);
+        const avgN = (nVals.reduce((a,b)=>a+b,0) / nVals.length);
+        const avgNText = avgN.toFixed(1);
+        let paragraphs = [];
+        const soilNames = data.map(d => d.soil_type || d.rock_type).filter(n => n);
+        const modeName = soilNames.sort((a,b) => soilNames.filter(v=>v===a).length - soilNames.filter(v=>v===b).length).pop() || symbol;
+        let headerText = `【地層：${symbol} (${modeName})】`;
+        paragraphs.push(headerText);
+        if (opts.depth) { paragraphs.push(`本層はGL-${minDepth}mからGL-${maxDepth}mの深度範囲に分布し、層厚は約${thickness}mである。`); }
+        if (opts.age) {
+            const ageText = GEO_AGES[ageKey] || '';
+            const classText = SOIL_CLASSIFICATIONS[classKey] || '';
+            let text = "";
+            if (ageText) text += `地質時代は${ageText}に相当する。`;
+            if (classText) text += `土質区分は${classText}に分類される。`;
+            if (text) paragraphs.push(text);
+        }
+        if (opts.n_stats) { paragraphs.push(`N値は${minN}～${maxN}（平均${avgNText}）の範囲を示す。`); }
+        if (opts.state) {
+            const stateDesc = getJGSDescription(avgN, classKey);
+            let stateSuffix = "状態";
+            if (classKey === 'sand' || classKey === 'gravel') stateSuffix = "締まり具合";
+            if (classKey === 'clay' || classKey === 'organic') stateSuffix = "コンシステンシー";
+            if (classKey.includes('rock')) stateSuffix = "硬軟";
+            if (stateDesc) { paragraphs.push(`全体として「${stateDesc}」${stateSuffix}を呈する。`); }
+        }
+        if (opts.trend && nVals.length > 3) {
+            const stdDev = Math.sqrt(nVals.map(x => Math.pow(x - avgN, 2)).reduce((a, b) => a + b) / nVals.length);
+            let homogeneityText = "";
+            if (stdDev < 2.0) homogeneityText = "ばらつきは小さく均質である。";
+            else if (stdDev > 5.0) homogeneityText = "ばらつきが大きく、局所的な変化が見られる。";
+            else homogeneityText = "標準的なばらつきを示す。";
+            let trendText = "";
+            const midDepths = data.map(d => (d.depth_start + d.depth_end)/2);
+            const slope = calculateSlope(midDepths, nVals);
+            if (slope > 0.5) trendText = "深度とともにN値は明瞭な増加傾向を示す。";
+            else if (slope > 0.1) trendText = "深度とともにN値は緩やかに増加する。";
+            else if (slope < -0.1) trendText = "下部ほどN値が低下する傾向がある。";
+            else trendText = "深度による顕著な増減は見られない。";
+            paragraphs.push(`${trendText}${homogeneityText}`);
+        }
+        if (opts.notes) {
+            let remarks = [];
+            if (selfSinkingCount > 0) {
+                const ratio = (selfSinkingCount / data.length) * 100;
+                if (ratio > 50) remarks.push("層の過半で自沈が確認される極めて軟弱な層である。");
+                else remarks.push("一部に自沈する軟弱部を挟在する。");
+            }
+            if (classKey === 'sand' || classKey === 'gravel') {
+                if (avgN >= 30) remarks.push("支持層として期待できる強度を有している。");
+                else if (avgN < 10) remarks.push("緩い堆積状態であり、液状化の検討が望まれる。");
+            } else if (classKey === 'clay' || classKey === 'organic') {
+                if (avgN < 4) remarks.push("圧密沈下等の検討が必要な軟弱層である。");
+            }
+            if (remarks.length > 0) { paragraphs.push(`特記事項として、${remarks.join("また、")}`); }
+        }
+        return paragraphs.join("\n");
+    }
+
+    function openSettingsModal(targetTabId = null) {
+        settingsBackup = JSON.parse(JSON.stringify(appGlobalSettings));
+        document.getElementById('settingsModal').style.display = 'block';
+        renderStandardColorsTab();
+        document.getElementById('exportQualitySelector').value = appGlobalSettings.general.exportQuality;
+        document.getElementById('freqLayoutSelector').value = appGlobalSettings.general.freqLayout;
+        document.getElementById('fontSelector').value = appGlobalSettings.general.fontFamily;
+        
+        const setVal = (id, val) => {
+            const numInput = document.getElementById(id);
+            const rangeInput = document.getElementById('range' + id.substring(3)); 
+            if(numInput) numInput.value = val;
+            if(rangeInput) rangeInput.value = val;
+        };
+        setVal('setTableCalcFontSize', appGlobalSettings.tables.calcFontSize);
+        setVal('setTableStatsFontSize', appGlobalSettings.tables.statsFontSize);
+        setVal('setChartCorrectedFontSize', appGlobalSettings.charts.correctedFontSize);
+        setVal('setChartCorrelationFontSize', appGlobalSettings.charts.correlationFontSize);
+        setVal('setChartCorrelationMarkerSize', appGlobalSettings.charts.correlationMarkerSize);
+        setVal('setChartFreqFontSize', appGlobalSettings.charts.freqFontSize);
+        setVal('setChartSpecialFontSize', appGlobalSettings.charts.specialFontSize);
+// ▼▼▼ 追加 ▼▼▼
+    setVal('setChartSpecialMarkerSizeN', appGlobalSettings.charts.specialMarkerSizeN || 6);
+    setVal('setChartSpecialMarkerSizeMean', appGlobalSettings.charts.specialMarkerSizeMean || 5);
+    setVal('setChartSpecialMarkerSizeRep', appGlobalSettings.charts.specialMarkerSizeRep || 10);
+    setVal('setChartSpecialMarkerSizeOutlier', appGlobalSettings.charts.specialMarkerSizeOutlier || 10);
+    // ▲▲▲ 追加 ▲▲▲
+        setVal('setChartSpecialMarkerSize', appGlobalSettings.charts.specialMarkerSize);
+        setVal('setSummaryStatsTableFontSize', appGlobalSettings.summary.statsTableFontSize);
+        setVal('setSummaryDataTableFontSize', appGlobalSettings.summary.dataTableFontSize);
+        setVal('setSummaryCorrelationFontSize', appGlobalSettings.summary.correlationFontSize);
+        setVal('setSummaryCorrelationMarkerSize', appGlobalSettings.summary.correlationMarkerSize);
+        setVal('setSummarySpecialFontSize', appGlobalSettings.summary.specialFontSize);
+        setVal('setSummarySpecialMarkerSize', appGlobalSettings.summary.specialMarkerSize);
+        setVal('setSummaryFreqFontSize', appGlobalSettings.summary.freqFontSize);
+        document.getElementById('setChartFreqStepSize').value = appGlobalSettings.charts.freqStepSize;
+        if (!appGlobalSettings.statistics) appGlobalSettings.statistics = { roundingMethod: 'dec2' };
+        document.getElementById('setStatsRoundingMethod').value = appGlobalSettings.statistics.roundingMethod || 'dec2';
+        
+        if (targetTabId) openSettingsTab(targetTabId); else openSettingsTab('tabGeneral');
+    }
+
+    function closeSettingsModal() { document.getElementById('settingsModal').style.display = 'none'; }
+    function openSettingsTab(tabId) {
+        document.querySelectorAll('.settings-content').forEach(d => d.classList.remove('active'));
+        document.querySelectorAll('.settings-tab').forEach(t => t.classList.remove('active'));
+        document.getElementById(tabId).classList.add('active');
+        const btnId = tabId + 'Btn';
+        const btn = document.getElementById(btnId);
+        if(btn) btn.classList.add('active');
+    }
+
+    function renderStandardColorsTab() {
+        const renderList = (type, containerId) => {
+            const container = document.getElementById(containerId);
+            container.innerHTML = '';
+            const list = appGlobalSettings.standardColors[type] || [];
+            list.forEach((item, index) => {
+                const div = document.createElement('div');
+                div.className = 'std-color-row';
+                div.innerHTML = `<input type="text" value="${item.key}" placeholder="記号" class="std-key-input"><input type="color" value="${item.color}" class="std-color-input"><button class="delete-row-btn" onclick="this.closest('.std-color-row').remove()">×</button>`;
+                container.appendChild(div);
+            });
+        };
+        renderList('soil', 'stdColorListSoil'); renderList('rock', 'stdColorListRock');
+    }
+    function addStdColorRow(type) {
+        const container = document.getElementById(type === 'soil' ? 'stdColorListSoil' : 'stdColorListRock');
+        const div = document.createElement('div'); div.className = 'std-color-row';
+        div.innerHTML = `<input type="text" value="" placeholder="記号" class="std-key-input"><input type="color" value="#888888" class="std-color-input"><button class="delete-row-btn" onclick="this.closest('.std-color-row').remove()">×</button>`;
+        container.appendChild(div);
+    }
+    function saveStandardColorsFromUI() {
+        const extract = (containerId) => {
+            const rows = document.querySelectorAll(`#${containerId} .std-color-row`);
+            const list = [];
+            rows.forEach(row => {
+                const key = row.querySelector('.std-key-input').value.trim();
+                const color = row.querySelector('.std-color-input').value;
+                if (key) list.push({ key: key, color: color });
+            });
+            return list;
+        };
+        appGlobalSettings.standardColors.soil = extract('stdColorListSoil');
+        appGlobalSettings.standardColors.rock = extract('stdColorListRock');
+    }
+    function updateGlobalSettingsFromDOM() {
+        saveStandardColorsFromUI();
+        appGlobalSettings.general.exportQuality = document.getElementById('exportQualitySelector').value;
+        appGlobalSettings.general.freqLayout = document.getElementById('freqLayoutSelector').value;
+        appGlobalSettings.general.fontFamily = document.getElementById('fontSelector').value;
+        appGlobalSettings.tables.calcFontSize = parseInt(document.getElementById('setTableCalcFontSize').value)||13;
+        appGlobalSettings.tables.statsFontSize = parseInt(document.getElementById('setTableStatsFontSize').value)||14;
+        appGlobalSettings.charts.correctedFontSize = parseInt(document.getElementById('setChartCorrectedFontSize').value)||12;
+        appGlobalSettings.charts.correlationFontSize = parseInt(document.getElementById('setChartCorrelationFontSize').value)||16;
+        appGlobalSettings.charts.correlationMarkerSize = parseInt(document.getElementById('setChartCorrelationMarkerSize').value)||6;
+        appGlobalSettings.charts.freqFontSize = parseInt(document.getElementById('setChartFreqFontSize').value)||14;
+        appGlobalSettings.charts.freqStepSize = parseInt(document.getElementById('setChartFreqStepSize').value)||5;
+        appGlobalSettings.charts.specialFontSize = parseInt(document.getElementById('setChartSpecialFontSize').value)||16;
+        // ▼▼▼ 追加 ▼▼▼
+    appGlobalSettings.charts.specialMarkerSizeN = parseInt(document.getElementById('setChartSpecialMarkerSizeN').value) || 6;
+    appGlobalSettings.charts.specialMarkerSizeMean = parseInt(document.getElementById('setChartSpecialMarkerSizeMean').value) || 5;
+    appGlobalSettings.charts.specialMarkerSizeRep = parseInt(document.getElementById('setChartSpecialMarkerSizeRep').value) || 10;
+    appGlobalSettings.charts.specialMarkerSizeOutlier = parseInt(document.getElementById('setChartSpecialMarkerSizeOutlier').value) || 10;
+    // ▲▲▲ 追加 ▲▲▲
+        appGlobalSettings.summary.statsTableFontSize = parseInt(document.getElementById('setSummaryStatsTableFontSize').value)||18;
+        appGlobalSettings.summary.dataTableFontSize = parseInt(document.getElementById('setSummaryDataTableFontSize').value)||16;
+        appGlobalSettings.summary.correlationFontSize = parseInt(document.getElementById('setSummaryCorrelationFontSize').value)||18;
+        appGlobalSettings.summary.correlationMarkerSize = parseInt(document.getElementById('setSummaryCorrelationMarkerSize').value)||7;
+        appGlobalSettings.summary.specialFontSize = parseInt(document.getElementById('setSummarySpecialFontSize').value)||18;
+        appGlobalSettings.summary.specialMarkerSize = parseInt(document.getElementById('setSummarySpecialMarkerSize').value)||6;
+        appGlobalSettings.summary.freqFontSize = parseInt(document.getElementById('setSummaryFreqFontSize').value)||16;
+        appGlobalSettings.statistics.roundingMethod = document.getElementById('setStatsRoundingMethod').value;
+        Chart.defaults.font.family = appGlobalSettings.general.fontFamily;
+    }
+    function previewSettings() { updateGlobalSettingsFromDOM(); Object.keys(viewDirtyState).forEach(key => viewDirtyState[key] = true); renderActiveView(); applyTableStyles(); }
+    function applyGlobalSettings() { previewSettings(); settingsBackup = null; closeSettingsModal(); }
+    function cancelSettings() { if (settingsBackup) { appGlobalSettings = settingsBackup; settingsBackup = null; Chart.defaults.font.family = appGlobalSettings.general.fontFamily; Object.keys(viewDirtyState).forEach(key => viewDirtyState[key] = true); renderActiveView(); applyTableStyles(); } closeSettingsModal(); }
+    function applyTableStyles() { const setStyle = (id, size) => { const table = document.getElementById(id); if(table) { table.style.fontSize = `${size}px`; table.querySelectorAll('th, td').forEach(cell => cell.style.fontSize = `${size}px`); } }; setStyle('dataTable', appGlobalSettings.tables.calcFontSize); setStyle('statisticsTableAll', appGlobalSettings.tables.statsFontSize); setStyle('statisticsTableExcluded', appGlobalSettings.tables.statsFontSize); setStyle('summaryStatisticsTable', appGlobalSettings.summary.statsTableFontSize); setStyle('summaryDataTable', appGlobalSettings.summary.dataTableFontSize); }
+
+    function getSymbolOrderMapping() { if (!soilStyleSettings || Object.keys(soilStyleSettings).length === 0) return {}; const sortedSymbols = Object.keys(soilStyleSettings).filter(s => s !== '不明' && !hiddenSymbols.has(s)).sort((a, b) => (soilStyleSettings[a]?.order || 999) - (soilStyleSettings[b]?.order || 999)); const mapping = {}; sortedSymbols.forEach((symbol, index) => { mapping[symbol] = `地層${index + 1}`; }); return mapping; }
+    function calculateConvertedN(count, penetration) { if (penetration <= 0) return count >= APP_CONSTANTS.N_CAP.CIVIL_SOIL ? Infinity : 0; const rawN = (count / penetration) * APP_CONSTANTS.CALC.FACTOR; return Math.round(rawN * 100) / 100; }
+    function getTotalN(d) { return (d.count5 || 0) + (d.count10 || 0) + (d.count15 || 0) + (d.count20 || 0) + (d.count25 || 0) + (d.count30 || 0); }
+    function getTotalPenetration(d) { return (d.pen5 || 0) + (d.pen10 || 0) + (d.pen15 || 0) + (d.pen20 || 0) + (d.pen25 || 0) + (d.pen30 || 0); }
+    function hexToRgba(hex, alpha = 0.3) { if (!hex || !hex.startsWith('#') || hex.length < 7) { return `rgba(200, 200, 200, ${alpha})`; } const r = parseInt(hex.slice(1, 3), 16); const g = parseInt(hex.slice(3, 5), 16); const b = parseInt(hex.slice(5, 7), 16); return `rgba(${r}, ${g}, ${b}, ${alpha})`; }
+
+    function addContextMenuToChart(canvasId) { const canvas = document.getElementById(canvasId); if (!canvas) return; canvas.removeEventListener('contextmenu', handleChartContextMenu); canvas.addEventListener('contextmenu', handleChartContextMenu); }
+    function handleChartContextMenu(event) { event.preventDefault(); const chart = chartInstances[event.target.id]; if (!chart) return; const points = chart.getElementsAtEventForMode(event, 'nearest', { intersect: true }, true); const menu = document.getElementById('customContextMenu'); if (points.length) { const point = points[0]; const dataset = chart.data.datasets[point.datasetIndex]; if (dataset.label === 'その他の土層' || dataset.label.includes('平均') || dataset.label.includes('代表')) return; const item = dataset.data[point.index].originalItem; if (!item || item.isCorrectedValue) return; contextTargetItem = item; const isExcluded = excludedPoints.has(item.id); document.getElementById('contextMenuExclude').style.display = isExcluded ? 'none' : 'block'; document.getElementById('contextMenuInclude').style.display = isExcluded ? 'block' : 'none'; menu.style.top = `${event.pageY}px`; menu.style.left = `${event.pageX}px`; menu.style.display = 'block'; } }
+
+    function processData(keepState = false) { 
+        if (!keepState) {
+            excludedPoints.clear(); 
+            correctedNValues = {}; 
+        }
+        const gridData = hot_data.getSourceData().filter(row => row.boring_hole); 
+        const elevationData = hot_elev.getSourceData().filter(row => row.boring_hole); 
+        try { 
+            const tempStyleSettings = { ...soilStyleSettings }; 
+            parseAllData(gridData, elevationData); 
+            Object.keys(tempStyleSettings).forEach(key => { if(soilStyleSettings[key]) soilStyleSettings[key] = tempStyleSettings[key]; }); 
+            const boringHoles = Object.keys(allBoringData); 
+            if(boringHoles.length === 0) { alert('有効なデータがありません。'); return; } 
+            updateBoringSelector(boringHoles); 
+            updateSelectedBoringHoles(); 
+            showView('legendView'); 
+        } catch (error) { console.error(error); alert('データ処理エラー'); } 
+    }
+    
+    function parseAllData(gridData, elevationData) { allBoringData = {}; const newSymbols = new Set(); gridData.forEach(row => { const holeId = String(row.boring_hole).trim(); if (!allBoringData[holeId]) allBoringData[holeId] = { data: [], elevation: null }; const rowData = { ...row, depth_start: parseFloat(row.depth_start) || 0, depth_end: parseFloat(row.depth_end) || 0, count5: parseInt(row.count5) || 0, pen5: parseInt(row.pen5) || 0, count10: parseInt(row.count10) || 0, pen10: parseInt(row.pen10) || 0, count15: parseInt(row.count15) || 0, pen15: parseInt(row.pen15) || 0, count20: parseInt(row.count20) || 0, pen20: parseInt(row.pen20) || 0, count25: parseInt(row.count25) || 0, pen25: parseInt(row.pen25) || 0, count30: parseInt(row.count30) || 0, pen30: parseInt(row.pen30) || 0 }; rowData.id = `${holeId}_${rowData.depth_start.toFixed(2)}`; allBoringData[holeId].data.push(rowData); newSymbols.add(rowData.soil_symbol || rowData.rock_symbol || '不明'); }); newSymbols.forEach(s => getOrCreateSoilStyle(s)); elevationData.forEach(row => { const holeId = String(row.boring_hole).trim(); if (allBoringData[holeId] && typeof row.elevation === 'number') allBoringData[holeId].elevation = row.elevation; }); populateStyleSettingsList(); }
+    
+    function changeStandard() { calculationStandard = document.querySelector('input[name="standard"]:checked').value; const archSettings = document.getElementById('architecturalSettings'); archSettings.style.display = (calculationStandard === 'architectural') ? 'block' : 'none'; if (selectedBoringHoles.length > 0) renderAllForSelectedHoles(); }
+    function changeArchitecturalNCap() { architecturalSoilNCap = parseInt(document.querySelector('input[name="arch_n_cap"]:checked').value, 10); if (selectedBoringHoles.length > 0) renderAllForSelectedHoles(); }
+    function changePenetrationInterval() { const selectedValue = document.querySelector('input[name="penetrationInterval"]:checked').value; if (penetrationInterval === selectedValue) return; penetrationInterval = selectedValue; if (hot_data) { const currentData = hot_data.getSourceData(); const newSettings = gridSettings[penetrationInterval]; hot_data.updateSettings({ columns: newSettings.columns, colHeaders: newSettings.colHeaders }); hot_data.loadData(currentData); } if (selectedBoringHoles.length > 0) renderAllForSelectedHoles(); }
+    function updateSelectedBoringHoles() { const selector = document.getElementById('boringSelector'); selectedBoringHoles = Array.from(selector.selectedOptions).map(opt => opt.value); if (selectedBoringHoles.length === 0 && selector.options.length > 0) { selector.options[0].selected = true; selectedBoringHoles.push(selector.options[0].value); } renderAllForSelectedHoles(); }
+    function filterVisibleData(data) { if (hiddenSymbols.size === 0) return data; return data.filter(d => { const symbol = d.soil_symbol || d.rock_symbol || ''; const correctedInfo = correctedNValues[d.id]; if (correctedInfo && (hiddenSymbols.has(correctedInfo.symbol1) || hiddenSymbols.has(correctedInfo.symbol2))) return false; return !hiddenSymbols.has(symbol); }); }
+
+    function renderAllForSelectedHoles() { 
+        if (selectedBoringHoles.length === 0) return; 
+        let combinedData = []; selectedBoringHoles.forEach(holeId => { if (allBoringData[holeId]) combinedData.push(...allBoringData[holeId].data); }); 
+        const visibleRawData = filterVisibleData(combinedData);
+        createTable(visibleRawData, 'dataTable'); 
+        currentStatsData = getProcessedDataForStatistics(combinedData);
+        createStatisticsTables(currentStatsData);
+        Object.keys(viewDirtyState).forEach(key => viewDirtyState[key] = true);
+        renderActiveView(); applyTableStyles();
+    }
+
+
+
+
+
+
+
+
+
+function renderActiveView() {
+        if (!viewDirtyState[currentActiveView]) return;
+        const data = currentStatsData;
+        if (currentActiveView === 'correlationChartView') createCorrelationCharts(data);
+        else if (currentActiveView === 'frequencyChartsView') createFrequencyCharts(data);
+        else if (currentActiveView === 'specialValueChartView') createSpecialValueCharts(data);
+        else if (currentActiveView === 'correctedNView') createCorrectedNCharts();
+        
+        // ▼▼▼▼▼▼ 追加・修正箇所 ▼▼▼▼▼▼
+        else if (currentActiveView === 'statisticsView') createStatisticsTables(data);
+        // ▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲
+        
+        else if (currentActiveView === 'layerSummaryView') {
+             const selector = document.getElementById('layerSelector');
+            const currentVal = selector.value;
+            const sortedSymbols = Object.keys(soilStyleSettings).filter(s => s !== '不明').sort((a,b) => (soilStyleSettings[a]?.order || 999) - (soilStyleSettings[b]?.order || 999));
+            selector.innerHTML = '';
+            sortedSymbols.forEach(s => { const option = document.createElement('option'); option.value = s; option.textContent = s; selector.appendChild(option); });
+            if (sortedSymbols.includes(currentVal)) { selector.value = currentVal; }
+            renderLayerSummaryView();
+        }
+        else if (currentActiveView === 'layerArticlesView') generateAllLayerArticles();
+        viewDirtyState[currentActiveView] = false;
+    }
+
+
+
+
+
+
+
+
+
+
+    function showView(viewId) { 
+        document.querySelectorAll('.view-container').forEach(v => v.style.display = 'none'); 
+        document.getElementById(viewId).style.display = 'block'; 
+        document.querySelectorAll('.header .btn-group .btn').forEach(b => { b.classList.remove('btn-active'); if (b.id && b.id.toLowerCase().includes(viewId.toLowerCase())) b.classList.add('btn-active'); }); 
+        currentActiveView = viewId; renderActiveView();
+        setTimeout(() => { Object.values(chartInstances).forEach(chart => { if (chart.canvas && chart.canvas.offsetParent !== null) chart.resize(); }); }, 100); 
+    }
+    
+    function updateBoringSelector(boringHoles) { const s = document.getElementById('boringSelector'); const selections = new Set(selectedBoringHoles); s.innerHTML = ''; boringHoles.sort().forEach(id => { const o = document.createElement('option'); o.value = id; o.textContent = id; if (selections.has(id)) o.selected = true; s.appendChild(o); }); }
+    function applyCorrelationChartRanges() { if (selectedBoringHoles.length === 0) { alert('孔番を選択してください。'); return; } renderAllForSelectedHoles(); }
+
+    function createCorrelationCharts(data) {
+        ['chartDepthSoil', 'chartElevSoil', 'chartDepthRock', 'chartElevRock'].forEach(id => { if (chartInstances[id]) { chartInstances[id].destroy(); delete chartInstances[id]; } });
+        if (!data || data.length === 0) return;
+        
+        const depthMin = parseFloat(document.getElementById('depthMin').value);
+        const depthMax = parseFloat(document.getElementById('depthMax').value);
+        const elevMin = parseFloat(document.getElementById('elevMin').value);
+        const elevMax = parseFloat(document.getElementById('elevMax').value);
+        
+        const soilMaxN = calculationStandard === 'civil' ? APP_CONSTANTS.N_CAP.CIVIL_SOIL : architecturalSoilNCap;
+        const fontSize = appGlobalSettings.charts.correlationFontSize; 
+        const markerSize = appGlobalSettings.charts.correlationMarkerSize; 
+        
+        const createChart = (canvasId, chartData, maxN, yAxisType) => {
+            const grouped = chartData.reduce((acc, item) => { const s = item.soil_symbol || item.rock_symbol || '不明'; (acc[s] = acc[s] || []).push(item); return acc; }, {});
+            const sortedSymbols = Object.keys(grouped).sort((a, b) => (soilStyleSettings[a]?.order || 99) - (soilStyleSettings[b]?.order || 99));
+            const outlierPoints = [];
+            
+            const datasets = sortedSymbols.map(s => {
+                const style = getOrCreateSoilStyle(s);
+                const points = grouped[s].map(d => {
+                    const n = d.isCorrectedValue ? d.correctedNValue : getTotalN(d);
+                    const pen = d.isCorrectedValue ? APP_CONSTANTS.CALC.PENETRATION_LIMIT : getTotalPenetration(d);
+                    const convertedN = calculateConvertedN(n, pen);
+                    const isItemRock = !!(d.rock_symbol || d.rock_type);
+                    const n_cap_for_item = isItemRock ? APP_CONSTANTS.N_CAP.ROCK : soilMaxN;
+                    const cappedN = Math.min(convertedN, n_cap_for_item);
+                    const holeElevation = allBoringData[d.boring_hole]?.elevation;
+                    const yValue = yAxisType === 'depth' ? (d.depth_start + d.depth_end) / 2 : (holeElevation !== null && holeElevation !== undefined ? holeElevation - (d.depth_start + d.depth_end) / 2 : null);
+                    const pointData = { x: cappedN, y: yValue, originalItem: d };
+                    if (excludedPoints.has(d.id)) { outlierPoints.push(pointData); }
+                    return pointData;
+                }).filter(p => p.y !== null);
+                return { label: s, data: points, backgroundColor: style.color, pointStyle: style.marker, radius: markerSize, clip: false };
+            });
+            
+            if (outlierPoints.length > 0) { datasets.push({ label: '特異値', data: outlierPoints, pointStyle: 'circle', radius: markerSize * 1.5, backgroundColor: 'transparent', borderColor: 'black', borderWidth: 2.5, clip: false }); }
+            
+            const yAxisOptions = yAxisType === 'depth' ? 
+                { title: { display: true, text: '深度 (m)', font: { size: fontSize + 2 } }, reverse: true, min: isNaN(depthMin) ? undefined : depthMin, max: isNaN(depthMax) ? undefined : depthMax, ticks: { font: { size: fontSize } } } : 
+                { title: { display: true, text: '標高 (m)', font: { size: fontSize + 2 } }, min: isNaN(elevMin) ? undefined : elevMin, max: isNaN(elevMax) ? undefined : elevMax, ticks: { font: { size: fontSize } } };
+            
+            const options = { 
+                responsive: true, maintainAspectRatio: false, animation: { duration: 0 }, 
+                layout: { padding: { right: 20, left: 10, top: 10, bottom: 10 } }, 
+                scales: { 
+                    x: { 
+                        beginAtZero: true, 
+                        max: maxN, 
+                        title: { display: true, text: 'N値', font: { size: fontSize + 2 } }, 
+                        ticks: { font: { size: fontSize } } 
+                    }, 
+                    y: yAxisOptions 
+                }, 
+                plugins: { 
+                    legend: { display: true, position: 'right', labels: { usePointStyle: true, font: { size: fontSize } } }, 
+                    tooltip: { enabled: true, callbacks: { label: function(context) { const item = context.raw.originalItem; let label = item.isCorrectedValue ? `補正値(${item.soil_symbol || item.rock_symbol})` : `${item.boring_hole} (${item.depth_start}m)`; if (context.dataset.label === '特異値') label = `特異値: ${label}`; return `${label}: N=${context.raw.x.toFixed(2)}`; } } } 
+                } 
+            };
+            
+            createManagedChart(canvasId, { type: 'scatter', data: { datasets }, options });
+            addContextMenuToChart(canvasId);
+        };
+        
+        createChart('chartDepthSoil', data, soilMaxN, 'depth'); 
+        createChart('chartElevSoil', data, soilMaxN, 'elevation'); 
+        createChart('chartDepthRock', data, APP_CONSTANTS.N_CAP.ROCK, 'depth'); 
+        createChart('chartElevRock', data, APP_CONSTANTS.N_CAP.ROCK, 'elevation');
+    }
+    
+    function createFrequencyCharts(data) { 
+        const container = document.getElementById('frequencyChartsGrid'); 
+        Object.keys(chartInstances).forEach(key => { if (key.startsWith('freq_')) { chartInstances[key].destroy(); delete chartInstances[key]; } }); 
+        container.innerHTML = ''; 
+        if (!data) return; 
+        
+        const mapping = getSymbolOrderMapping(); 
+        const grouped = data.reduce((acc, item) => { const s = item.soil_symbol || item.rock_symbol || '不明'; if (s !== '不明') (acc[s] = acc[s] || []).push(item); return acc; }, {}); 
+        const sortedSymbols = Object.keys(grouped).sort((a, b) => (soilStyleSettings[a]?.order || 99) - (soilStyleSettings[b]?.order || 99)); 
+        const fontSize = appGlobalSettings.charts.freqFontSize; 
+        const stepSize = appGlobalSettings.charts.freqStepSize; 
+        
+        for (const symbol of sortedSymbols) { 
+            const dataForSymbol = grouped[symbol]; 
+            const isRock = dataForSymbol.some(d => d.rock_symbol || d.rock_type); 
+            let bins; 
+            if (calculationStandard === 'civil') { bins = isRock ? FREQUENCY_BINS.civil_rock : FREQUENCY_BINS.civil_soil; } 
+            else { bins = isRock ? FREQUENCY_BINS.architectural_rock : FREQUENCY_BINS.architectural_soil; } 
+            
+            const counts = Array(bins.length).fill(0); 
+            dataForSymbol.forEach(d => { 
+                const n_hits = d.isCorrectedValue ? d.correctedNValue : getTotalN(d);
+                const pen = d.isCorrectedValue ? APP_CONSTANTS.CALC.PENETRATION_LIMIT : getTotalPenetration(d);
+                const n = calculateConvertedN(n_hits, pen);
+                
+                const binIndex = bins.findIndex(b => n >= b.min && n <= b.max); 
+                if (binIndex !== -1) counts[binIndex]++; 
+            }); 
+            
+            const maxFreq = Math.max(...counts); 
+            let suggestedMax = Math.ceil(maxFreq / stepSize) * stepSize; 
+            if (suggestedMax <= maxFreq && maxFreq > 0) { suggestedMax += stepSize; } 
+            if (suggestedMax === 0) { suggestedMax = stepSize; } 
+            
+            const style = getOrCreateSoilStyle(symbol); 
+            const chartBox = document.createElement('div'); 
+            chartBox.className = 'freq-chart-box'; 
+            const canvasId = `canvas_freq_${symbol}`; 
+            const title = `${mapping[symbol] || ''}: ${symbol}`; 
+            
+            chartBox.innerHTML = `<div class="freq-chart-header" style="background-color: ${style.color}; color: #1f2937;"><span>${title}</span><span class="data-count">データ数=${dataForSymbol.length}</span></div><div class="freq-chart-canvas-wrapper"><canvas id="${canvasId}"></canvas></div>`; 
+            container.appendChild(chartBox); 
+            
+            const options = { responsive: true, maintainAspectRatio: false, animation: { duration: 0 }, scales: { y: { beginAtZero: true, max: suggestedMax, title: { display: true, text: '頻度', font: { size: fontSize } }, ticks: { stepSize: stepSize, precision: 0, font: { size: fontSize } } }, x: { ticks: { font: { size: fontSize } } } }, plugins: { legend: { display: false }, datalabels: { anchor: 'end', align: 'top', formatter: (v) => v > 0 ? v : null, color: '#1f2937', font: { weight: 'bold', size: fontSize } } } }; 
+            createManagedChart(canvasId, { type: 'bar', data: { labels: bins.map(b => b.label), datasets: [{ data: counts, backgroundColor: style.color + 'BF', borderColor: style.color }] }, options: options, plugins: [ChartDataLabels] }, `freq_${symbol}`);
+        } 
+    }
+
+    function createStatisticsTables(data) { const allData = data; const filteredData = data.filter(item => !excludedPoints.has(item.id)); renderStatisticsTable('statisticsTableAll', allData); renderStatisticsTable('statisticsTableExcluded', filteredData); }
+    function renderStatisticsTable(tableId, data) {
+        const table = document.getElementById(tableId);
+        table.innerHTML = `<thead><tr><th rowspan="2">No.</th><th rowspan="2">記号</th><th rowspan="2">個数</th><th rowspan="2">最大値</th><th rowspan="2">最小値</th><th>平均</th><th rowspan="2">標準偏差σ</th><th rowspan="2">変動係数V</th><th rowspan="2">平均値-σ/2</th><th>代表</th><th rowspan="2">決定方法</th></tr><tr><th>N値</th><th>N値</th></tr></thead><tbody></tbody>`;
+        const tbody = table.querySelector('tbody'); const isCivil = calculationStandard === 'civil'; const soil_n_cap = isCivil ? APP_CONSTANTS.N_CAP.CIVIL_SOIL : architecturalSoilNCap; const rock_n_cap = APP_CONSTANTS.N_CAP.ROCK; const mapping = getSymbolOrderMapping(); const method = document.getElementById('representativeNMethod') ? document.getElementById('representativeNMethod').value : 'auto_0.2';
+        const grouped_data = data.reduce((acc, item) => { const symbol = item.soil_symbol || item.rock_symbol; if (symbol && symbol !== '不明') { if (!acc[symbol]) acc[symbol] = []; acc[symbol].push(item); } return acc; }, {}); const sortedSymbols = Object.keys(grouped_data).sort((a, b) => (soilStyleSettings[a]?.order || 99) - (soilStyleSettings[b]?.order || 99)); if (sortedSymbols.length === 0) { tbody.innerHTML = `<tr><td colspan="11">データがありません。</td></tr>`; return; }
+        sortedSymbols.forEach(symbol => {
+            const dataForSymbol = grouped_data[symbol]; const isRock = dataForSymbol.some(d => d.rock_symbol || d.rock_type); const n_cap = isRock ? rock_n_cap : soil_n_cap; const nValues = dataForSymbol.map(item => { const n_hits = item.isCorrectedValue ? item.correctedNValue : getTotalN(item); const pen = item.isCorrectedValue ? APP_CONSTANTS.CALC.PENETRATION_LIMIT : getTotalPenetration(item); const raw_n = calculateConvertedN(n_hits, pen); return Math.min(raw_n, n_cap); }); 
+            const count = nValues.length; if (count === 0) return; const max = Math.max(...nValues); const min = Math.min(...nValues); const sum = nValues.reduce((a, b) => a + b, 0); const mean = sum / count;
+            let stdDev = NaN; if (count > 1) { const variance = nValues.reduce((acc, val) => acc + Math.pow(val - mean, 2), 0) / (count - 1); stdDev = Math.sqrt(variance); } const variationCoeff = !isNaN(stdDev) && mean !== 0 ? stdDev / mean : NaN; const meanMinusSigmaDiv2 = !isNaN(stdDev) ? mean - (stdDev / 2) : NaN; let representativeN; let decisionMethod; if (count === 1) { representativeN = nValues[0]; decisionMethod = '試験値'; } else if (isNaN(stdDev) || stdDev === 0) { representativeN = mean; decisionMethod = '平均N値'; } else { if (method.startsWith('auto')) { const threshold = parseFloat(method.split('_')[1] || '0.2'); if (stdDev <= 1 || (stdDev > 1 && variationCoeff <= threshold)) { representativeN = mean; decisionMethod = `平均N値 (V≤${threshold})`; } else { representativeN = meanMinusSigmaDiv2; decisionMethod = `平均N値-σ/2 (V>${threshold})`; } } else if (method === 'mean_minus_sigma_div_2') { representativeN = meanMinusSigmaDiv2; decisionMethod = '平均N値-標準偏差/2'; } else if (method === 'mean') { representativeN = mean; decisionMethod = '平均N値'; } } if (representativeN < 0) representativeN = 0;
+            const tr = document.createElement('tr'); const style = soilStyleSettings[symbol]; const bgColor = style ? style.color : 'transparent'; const getContrastTextColor = (hexColor) => { if (!hexColor || !hexColor.startsWith('#')) return '#000000'; const r = parseInt(hexColor.slice(1, 3), 16); const g = parseInt(hexColor.slice(3, 5), 16); const b = parseInt(hexColor.slice(5, 7), 16); return (r * 0.299 + g * 0.587 + b * 0.114) > 186 ? '#000000' : '#FFFFFF'; }; const textColor = getContrastTextColor(bgColor);
+            const formattedRepN = getRoundedRepresentativeN(representativeN);
+            tr.innerHTML = `<td>${mapping[symbol] || ''}</td><td style="text-align: center; background-color: ${bgColor}; color: ${textColor};">${symbol}</td><td>${count}</td><td>${max.toFixed(2)}</td><td>${min.toFixed(2)}</td><td>${mean.toFixed(2)}</td><td>${isNaN(stdDev) ? '―' : stdDev.toFixed(3)}</td><td>${isNaN(variationCoeff) ? '―' : variationCoeff.toFixed(3)}</td><td>${isNaN(meanMinusSigmaDiv2) ? '―' : meanMinusSigmaDiv2.toFixed(3)}</td><td>${formattedRepN}</td><td style="text-align: left;">${decisionMethod}</td>`; tbody.appendChild(tr);
+        });
+    }
+
+    function createSpecialValueCharts(data) {
+        ['specialValueChartSoil', 'specialValueChartRock'].forEach(id => { if (chartInstances[id]) { chartInstances[id].destroy(); delete chartInstances[id]; } });
+        if (!data || data.length === 0) return;
+        const soilData = data.filter(d => !(d.rock_symbol || d.rock_type)); const rockData = data.filter(d => d.rock_symbol || d.rock_type);
+        const fontSize = appGlobalSettings.charts.specialFontSize; 
+        
+        // ▼▼▼ ここを書き換え（サイズを個別に取得） ▼▼▼
+        const sizeN = appGlobalSettings.charts.specialMarkerSizeN || 6;
+        const sizeMean = appGlobalSettings.charts.specialMarkerSizeMean || 5;
+        const sizeRep = appGlobalSettings.charts.specialMarkerSizeRep || 10;
+        const sizeOutlier = appGlobalSettings.charts.specialMarkerSizeOutlier || 10;
+        // ▲▲▲ 書き換えここまで ▲▲▲
+        
+        const categoryBackgrounds = { id: 'categoryBackgrounds', beforeDraw(chart) { const { ctx, chartArea, scales: { y } } = chart; if (!y.ticks || y.ticks.length === 0) return; const bandWidth = (chartArea.bottom - chartArea.top) / Math.max(1, y.ticks.length); y.ticks.forEach((tick, index) => { const symbol = tick.label.split(' ').pop(); const style = soilStyleSettings[symbol]; if (style) { ctx.fillStyle = hexToRgba(style.color, 0.3); const yPos = y.getPixelForTick(index); ctx.fillRect(chartArea.left, yPos - (bandWidth / 2), chartArea.width, bandWidth); } }); } };
+        const yAxisTableLinesPlugin = { id: 'yAxisTableLines', afterDraw: (chart) => { const { ctx, chartArea, scales: { y } } = chart; if (!y || y.ticks.length === 0) return; const { left: yAxisLeft, right: yAxisRight, top, bottom } = y; const bandHeight = (bottom - top) / y.ticks.length; ctx.save(); ctx.strokeStyle = '#cccccc'; ctx.lineWidth = 1; const topY = y.getPixelForTick(0) - bandHeight / 2; ctx.beginPath(); ctx.moveTo(yAxisLeft, topY); ctx.lineTo(yAxisRight, topY); ctx.stroke(); y.ticks.forEach((tick, index) => { const yPos = y.getPixelForTick(index); const lineY = yPos + bandHeight / 2; ctx.beginPath(); ctx.moveTo(yAxisLeft, lineY); ctx.lineTo(yAxisRight, lineY); ctx.stroke(); ctx.beginPath(); ctx.moveTo(chartArea.left, lineY); ctx.lineTo(chartArea.right, lineY); ctx.stroke(); }); ctx.beginPath(); ctx.moveTo(yAxisRight, topY); ctx.lineTo(yAxisRight, bottom); ctx.stroke(); ctx.restore(); } };
+        const legendBoxPlugin = { id: 'legendBox', afterDraw: (chart) => { const { legend } = chart; if (!legend || !legend.active || legend.legendItems.length <= 1) return; const { ctx } = chart; const { left, top, width, height } = legend; ctx.save(); ctx.strokeStyle = '#666'; ctx.lineWidth = 1; ctx.strokeRect(left - 10, top - 5, width + 20, height + 10); ctx.restore(); } };
+        
+        const createChart = (canvasId, chartData, isRock) => {
+            const wrapper = document.getElementById(canvasId).closest('.chart-wrapper'); 
+            if (chartData.length === 0) { wrapper.style.height = '600px'; const ctx = document.getElementById(canvasId).getContext('2d'); ctx.clearRect(0, 0, ctx.canvas.width, ctx.canvas.height); return; }; 
+            const isCivil = calculationStandard === 'civil'; const soil_n_cap = isCivil ? APP_CONSTANTS.N_CAP.CIVIL_SOIL : architecturalSoilNCap; const rock_n_cap = APP_CONSTANTS.N_CAP.ROCK; const x_max = (isRock ? rock_n_cap : soil_n_cap) + 10; const legendSuffix = excludedPoints.size > 0 ? ' (特異値除外後)' : ''; const mapping = getSymbolOrderMapping(); const grouped_data = chartData.reduce((acc, item) => { const symbol = item.soil_symbol || item.rock_symbol; if (symbol && symbol !== '不明') { if (!acc[symbol]) acc[symbol] = []; acc[symbol].push(item); } return acc; }, {}); const sortedSymbols = Object.keys(grouped_data).sort((a, b) => (soilStyleSettings[a]?.order || 99) - (soilStyleSettings[b]?.order || 99)); const chartLabels = sortedSymbols.map(s => `${mapping[s] || ''} ${s}`); const numSymbols = sortedSymbols.length; const newHeight = Math.max(200, Math.min(600, numSymbols * 35 + 100)); wrapper.style.height = `${newHeight}px`; 
+            const individualPoints = [], averages = [], representatives = [], outlierCircles = [];
+            sortedSymbols.forEach(symbol => { const dataForSymbol = grouped_data[symbol]; const n_cap = isRock ? rock_n_cap : soil_n_cap; const yLabel = `${mapping[symbol] || ''} ${symbol}`; const nValuesData = dataForSymbol.map(item => { const n_hits = item.isCorrectedValue ? item.correctedNValue : getTotalN(item); const pen = item.isCorrectedValue ? APP_CONSTANTS.CALC.PENETRATION_LIMIT : getTotalPenetration(item); const raw_n = calculateConvertedN(n_hits, pen); return { n: Math.min(raw_n, n_cap), item: item }; }); 
+            nValuesData.forEach(d => { const point = { x: d.n, y: yLabel, originalItem: d.item }; individualPoints.push(point); if (excludedPoints.has(d.item.id)) { outlierCircles.push(point); } }); const filteredNValues = nValuesData.filter(d => !excludedPoints.has(d.item.id)).map(d => d.n); const count = filteredNValues.length; if (count > 0) { const sum = filteredNValues.reduce((a, b) => a + b, 0); const mean = sum / count; averages.push({ x: mean, y: yLabel }); let stdDev = NaN; if (count > 1) { const variance = filteredNValues.reduce((acc, val) => acc + Math.pow(val - mean, 2), 0) / (count - 1); stdDev = Math.sqrt(variance); } let representativeN; if (count === 1) representativeN = filteredNValues[0]; else if (isNaN(stdDev) || stdDev === 0) representativeN = mean; else if (stdDev <= 1 || (stdDev > 1 && (stdDev / mean) <= 0.2)) representativeN = mean; else representativeN = mean - (stdDev / 2); if (representativeN < 0) representativeN = 0; representatives.push({ x: parseFloat(getRoundedRepresentativeN(representativeN)), y: yLabel }); } });
+            
+            // ... 前略 ...
+            const datasets = [ 
+                { 
+                    type: 'scatter', 
+                    label: 'N値', 
+                    data: individualPoints, 
+                    pointStyle: 'rect', 
+                    backgroundColor: 'black', 
+                    radius: sizeN,  // ←ここを sizeN に変更
+                    maxBarThickness: 40 
+                }, 
+                { 
+                    type: 'scatter', 
+                    label: '平均N値' + legendSuffix, 
+                    data: averages, 
+                    pointStyle: 'circle', 
+                    backgroundColor: 'red', 
+                    radius: sizeMean, // ←ここを sizeMean に変更
+                    borderColor: 'darkred', 
+                    borderWidth: 1 
+                }, 
+                { 
+                    type: 'scatter', 
+                    label: '代表N値' + legendSuffix, 
+                    data: representatives, 
+                    pointStyle: 'triangle', 
+                    backgroundColor: 'transparent', 
+                    radius: sizeRep, // ←ここを sizeRep に変更
+                    borderColor: 'green', 
+                    borderWidth: 2.5 
+                }, 
+            ]; 
+            if (outlierCircles.length > 0) { 
+                datasets.push({ 
+                    type: 'scatter', 
+                    label: '特異値', 
+                    data: outlierCircles, 
+                    pointStyle: 'circle', 
+                    radius: sizeOutlier, // ←ここを sizeOutlier に変更
+                    backgroundColor: 'transparent', 
+                    borderColor: 'black', 
+                    borderWidth: 2.5 
+                }); 
+            }
+            // ... 後略 ...
+            
+            createManagedChart(canvasId, { 
+                type: 'bar', 
+                data: { labels: chartLabels, datasets: datasets }, 
+                options: { 
+                    responsive: true, maintainAspectRatio: false, indexAxis: 'y', animation: { duration: 0 }, 
+                    layout: { padding: { left: 10 } }, 
+                    scales: { x: { beginAtZero: true, max: x_max, title: { display: true, text: 'N値', font: { size: fontSize + 2 } }, ticks: { font: { size: fontSize } } }, y: { type: 'category', offset: true, ticks: { font: { size: fontSize }, padding: 16 }, grid: { drawOnChartArea: false } } }, 
+                    plugins: { legend: { display: true, position: 'bottom', align: 'center', labels: { usePointStyle: true, boxWidth: 20, padding: 15, font: { size: fontSize } } }, tooltip: { enabled: true, callbacks: { label: function(context) { const item = context.raw.originalItem; let label = item.isCorrectedValue ? `補正値(${item.soil_symbol || item.rock_symbol})` : `${item.boring_hole} (${item.depth_start}m)`; if (context.dataset.label === '特異値') { label = `特異値: ${label}`; } else if (context.dataset.label !== 'N値') { return `${context.dataset.label}: ${context.raw.x.toFixed(2)}`; } return `${label}: N=${context.raw.x.toFixed(2)}`; } } } } 
+                }, 
+                plugins: [categoryBackgrounds, yAxisTableLinesPlugin, legendBoxPlugin] 
+            });
+            addContextMenuToChart(canvasId);
+        };
+        createChart('specialValueChartSoil', soilData, false); createChart('specialValueChartRock', rockData, true);
+    }
+
+    function createTable(data, tableId = 'dataTable') {
+        const isCivil = calculationStandard === 'civil'; const measured_n_cap = isCivil ? APP_CONSTANTS.N_CAP.CIVIL_SOIL : 60; const soil_n_cap = isCivil ? APP_CONSTANTS.N_CAP.CIVIL_SOIL : architecturalSoilNCap; const rock_n_cap = APP_CONSTANTS.N_CAP.ROCK; const header_soil = `換算N値<br>max${soil_n_cap}`; const header_rock = `換算N値<br>max${rock_n_cap}`; const is5cm = penetrationInterval === '5cm';
+        const table = document.getElementById(tableId); 
+        const baseHeaderStart = `<thead><tr><th rowspan="2" style="background:#ffcdd2; min-width:40px;">除外</th><th rowspan="2">孔番</th><th rowspan="2">開始深度<br>(m)</th><th rowspan="2">終了深度<br>(m)</th>`; 
+        const penetrationHeader = is5cm ? `<th colspan="2">5cm</th><th colspan="2">10cm</th><th colspan="2">15cm</th><th colspan="2">20cm</th><th colspan="2">25cm</th><th colspan="2">30cm</th>` : `<th colspan="2">10cm</th><th colspan="2">20cm</th><th colspan="2">30cm</th>`; 
+        const baseHeaderEnd = `<th rowspan="2">土質区分</th><th rowspan="2">岩盤区分</th><th rowspan="2">土層記号</th><th rowspan="2">岩層記号</th><th>測定Ｎ値</th><th>貫入量</th><th colspan="2">換算Ｎ値</th><th rowspan="2">補正N値(1)</th><th rowspan="2">補正N値(2)</th><th rowspan="2">備考</th></tr>`; 
+        const subHeader = is5cm ? `<th>回数</th><th>貫入量</th>`.repeat(6) : `<th>回数</th><th>貫入量</th>`.repeat(3); 
+        const subHeaderEnd = `<th>回数</th><th>cm</th><th>${header_soil}</th><th>${header_rock}</th></tr></thead><tbody></tbody>`; 
+        table.innerHTML = `${baseHeaderStart}${penetrationHeader}${baseHeaderEnd}<tr>${subHeader}${subHeaderEnd}`;
+        const tbody = table.querySelector('tbody'); if(!data || data.length === 0) { tbody.innerHTML = `<tr><td colspan="26">表示するデータがありません。</td></tr>`; return; }
+        data.sort((a,b) => a.boring_hole.localeCompare(b.boring_hole) || a.depth_start - b.depth_start).forEach((row) => { 
+            if (getTotalN(row) === 0 && getTotalPenetration(row) === 0 && !row.isCorrectedValue) return; 
+            const tr = document.createElement('tr'); const n = getTotalN(row); const pen = getTotalPenetration(row); const raw_n = calculateConvertedN(n, pen); const isRock = !!(row.rock_symbol || row.rock_type); const conv_n_soil = Math.min(raw_n, soil_n_cap); const conv_n_rock = Math.min(raw_n, rock_n_cap); 
+            let rem = []; const isExcluded = excludedPoints.has(row.id); const correctionInfo = correctedNValues[row.id]; const hasCorrection = correctionInfo && (correctionInfo.val1 !== null || correctionInfo.val2 !== null); 
+            if (hasCorrection) rem.push('補正N値で代替'); if (n === 0 && pen > APP_CONSTANTS.CALC.PENETRATION_LIMIT) rem.push('自沈'); if (n >= measured_n_cap && pen < APP_CONSTANTS.CALC.PENETRATION_LIMIT) rem.push(`打止 (N≧${measured_n_cap})`); 
+            if (isExcluded) { rem.push('特異値'); if (!hasCorrection) tr.style.backgroundColor = '#f0f0f0'; } 
+            const overriddenClass = hasCorrection ? 'class="cell-overridden"' : ''; const soil_val = isRock ? '' : conv_n_soil.toFixed(2); const rock_val = isRock ? conv_n_rock.toFixed(2) : ''; 
+            const soilSymbol = row.soil_symbol || ''; const rockSymbol = row.rock_symbol || ''; const soilStyle = soilStyleSettings[soilSymbol]; const rockStyle = soilStyleSettings[rockSymbol]; 
+            const soilBgColor = soilStyle ? soilStyle.color : 'transparent'; const rockBgColor = rockStyle ? rockStyle.color : 'transparent'; 
+            const getContrastTextColor = (hexColor) => { if (!hexColor || !hexColor.startsWith('#')) return '#000000'; const r = parseInt(hexColor.slice(1, 3), 16); const g = parseInt(hexColor.slice(3, 5), 16); const b = parseInt(hexColor.slice(5, 7), 16); return (r * 0.299 + g * 0.587 + b * 0.114) > 186 ? '#000000' : '#FFFFFF'; }; 
+            const soilTextColor = getContrastTextColor(soilBgColor); const rockTextColor = getContrastTextColor(rockBgColor); 
+            const formatPair = (c, p) => ((c === 0 || c == null) && (p === 0 || p == null)) ? { c: '', p: '' } : { c: c ?? 0, p: p ?? 0 }; 
+            const p5 = formatPair(row.count5, row.pen5); const p10 = formatPair(row.count10, row.pen10); const p15 = formatPair(row.count15, row.pen15); const p20 = formatPair(row.count20, row.pen20); const p25 = formatPair(row.count25, row.pen25); const p30 = formatPair(row.count30, row.pen30); 
+            const penetrationCellsHtml = is5cm ? `<td>${p5.c}</td><td>${p5.p}</td><td>${p10.c}</td><td>${p10.p}</td><td>${p15.c}</td><td>${p15.p}</td><td>${p20.c}</td><td>${p20.p}</td><td>${p25.c}</td><td>${p25.p}</td><td>${p30.c}</td><td>${p30.p}</td>` : `<td>${p10.c}</td><td>${p10.p}</td><td>${p20.c}</td><td>${p20.p}</td><td>${p30.c}</td><td>${p30.p}</td>`; 
+            const corrected = correctedNValues[row.id] || {}; const correctedN1Text = corrected.val1 !== undefined ? `${corrected.val1.toFixed(1)} (${corrected.symbol1 || '未設定'})` : ''; const correctedN2Text = corrected.val2 !== undefined ? `${corrected.val2.toFixed(1)} (${corrected.symbol2 || '未設定'})` : ''; 
+            const correctedN1Style = corrected.symbol1 && soilStyleSettings[corrected.symbol1] ? `style="background-color: ${soilStyleSettings[corrected.symbol1].color}40"` : ''; const correctedN2Style = corrected.symbol2 && soilStyleSettings[corrected.symbol2] ? `style="background-color: ${soilStyleSettings[corrected.symbol2].color}40"` : ''; 
+            tr.innerHTML = `<td style="text-align:center;"><input type="checkbox" onchange="toggleOutlierFromTable('${row.id}', this.checked)" ${isExcluded ? 'checked' : ''} style="transform: scale(1.2); cursor: pointer;"></td><td>${row.boring_hole}</td><td>${row.depth_start.toFixed(2)}</td><td>${row.depth_end.toFixed(2)}</td>${penetrationCellsHtml}<td ${overriddenClass} style="text-align: left;">${row.soil_type||''}</td><td ${overriddenClass} style="text-align: left;">${row.rock_type||''}</td><td ${overriddenClass} style="background-color: ${soilBgColor}; color: ${soilTextColor};">${soilSymbol}</td><td ${overriddenClass} style="background-color: ${rockBgColor}; color: ${rockTextColor};">${rockSymbol}</td><td ${overriddenClass}>${n}</td><td ${overriddenClass}>${pen}</td><td ${overriddenClass}>${soil_val}</td><td ${overriddenClass}>${rock_val}</td><td ${correctedN1Style}>${correctedN1Text}</td><td ${correctedN2Style}>${correctedN2Text}</td><td style="font-size: 11px;">${rem.join(', ')}</td>`; tbody.appendChild(tr); 
+        });
+    }
+
+    function getProcessedDataForStatistics(inputData) { const overriddenIds = new Set(Object.keys(correctedNValues).filter(id => correctedNValues[id] && (correctedNValues[id].val1 !== undefined || correctedNValues[id].val2 !== undefined))); const unaffectedData = inputData.filter(item => !overriddenIds.has(item.id)); const correctedDataObjects = []; const allRockSymbols = new Set(inputData.map(d => d.rock_symbol).filter(Boolean)); overriddenIds.forEach(id => { const originalData = inputData.find(item => item.id === id); if (!originalData) return; const correction = correctedNValues[id]; if (correction.val1 !== undefined && correction.symbol1) { const isRock = allRockSymbols.has(correction.symbol1); correctedDataObjects.push({ ...originalData, isCorrectedValue: true, correctedNValue: correction.val1, soil_symbol: !isRock ? correction.symbol1 : '', rock_symbol: isRock ? correction.symbol1 : '', soil_type: '', rock_type: '' }); } if (correction.val2 !== undefined && correction.symbol2) { const isRock = allRockSymbols.has(correction.symbol2); correctedDataObjects.push({ ...originalData, isCorrectedValue: true, correctedNValue: correction.val2, soil_symbol: !isRock ? correction.symbol2 : '', rock_symbol: isRock ? correction.symbol2 : '', soil_type: '', rock_type: '' }); } }); const combined = [...unaffectedData, ...correctedDataObjects]; return filterVisibleData(combined); }
+    function createCorrectedNCharts() { const grid = document.getElementById('correctedNChartsGrid'); grid.innerHTML = ''; Object.keys(chartInstances).forEach(key => { if (key.startsWith('corrected-')) { chartInstances[key].destroy(); delete chartInstances[key]; } }); if (selectedBoringHoles.length === 0) { grid.innerHTML = '<p>孔番を選択してください。</p>'; return; } let selectedData = []; selectedBoringHoles.forEach(holeId => { if (allBoringData[holeId]) { selectedData.push(...allBoringData[holeId].data); } }); const visibleData = filterVisibleData(selectedData); if (visibleData.length === 0) { grid.innerHTML = '<p>表示する試験データがありません。</p>'; return; } const allSymbols = Object.keys(soilStyleSettings).filter(s => s !== '不明').sort((a, b) => (soilStyleSettings[a]?.order || 999) - (soilStyleSettings[b]?.order || 999)); const mapping = getSymbolOrderMapping(); const symbolOptions = allSymbols.map(s => `<option value="${s}">${mapping[s] || ''}: ${s}</option>`).join(''); visibleData.filter(d => getTotalN(d) > 0 || getTotalPenetration(d) > 0).forEach(testData => { const chartId = `corrected-chart-${testData.id}`; const values = correctedNValues[testData.id] || {}; const val1_text = values.val1 !== undefined ? values.val1.toFixed(1) : '-'; const val2_text = values.val2 !== undefined ? values.val2.toFixed(1) : '-'; const currentSymbol = testData.soil_symbol || testData.rock_symbol || '未設定'; const chartContainer = document.createElement('div'); chartContainer.className = 'chart-box corrected-chart-box'; chartContainer.id = `box-${testData.id}`; chartContainer.innerHTML = `<button class="btn export-btn" onclick="exportCorrectedNChartToPNG('${testData.id}')">PNG</button><h4>${testData.boring_hole} (${testData.depth_start.toFixed(2)}m) N=${getTotalN(testData)} [${currentSymbol}]</h4><p class="correction-instruction-text" id="instruction-${testData.id}"></p><div class="correction-controls-wrapper" id="values-${testData.id}"><div class="correction-row"><button class="btn btn-sm" onclick="startCorrection('${testData.id}', 1)">補正線(1)設定</button><span class="val1">補正N値(1): ${val1_text}</span><select id="select-${testData.id}-1" onchange="handleSoilSymbolChange('${testData.id}', 1, this.value)" ${val1_text === '-' ? 'disabled' : ''}><option value="">地層選択...</option>${symbolOptions}</select></div><div class="correction-row"><button class="btn btn-sm" onclick="startCorrection('${testData.id}', 2)">補正線(2)設定</button><span class="val2">補正N値(2): ${val2_text}</span><select id="select-${testData.id}-2" onchange="handleSoilSymbolChange('${testData.id}', 2, this.value)" ${val2_text === '-' ? 'disabled' : ''}><option value="">地層選択...</option>${symbolOptions}</select></div><div class="reset-button-container"><button class="btn btn-sm btn-danger" onclick="resetCorrection('${testData.id}')">リセット</button></div></div><div class="chart-wrapper" style="height: 300px;"><canvas id="${chartId}"></canvas></div>`; grid.appendChild(chartContainer); if (values.symbol1) document.getElementById(`select-${testData.id}-1`).value = values.symbol1; if (values.symbol2) document.getElementById(`select-${testData.id}-2`).value = values.symbol2; renderSingleCorrectedChart(chartId, testData); }); }
+    
+    function renderSingleCorrectedChart(canvasId, testData) { let cumulativeCount = 0; let cumulativePen = 0; const points = [{ x: 0, y: 0, label: '開始点' }]; const intervals = penetrationInterval === '10cm' ? [10, 20, 30] : [5, 10, 15, 20, 25, 30]; intervals.forEach(p => { const count = testData[`count${p}`] || 0; const pen = testData[`pen${p}`] || 0; if (count > 0 || pen > 0) { cumulativeCount += count; cumulativePen += pen; points.push({ x: cumulativeCount, y: cumulativePen, label: `${p}cm` }); } }); const annotations = {}; const values = correctedNValues[testData.id]; if (values) { if (values.line1) { annotations.line1 = { type: 'line', xMin: values.line1.xMin, yMin: values.line1.yMin, xMax: values.line1.xMax, yMax: values.line1.yMax, borderColor: '#e67e22', borderWidth: 3 }; } if (values.line2) { annotations.line2 = { type: 'line', xMin: values.line2.xMin, yMin: values.line2.yMin, xMax: values.line2.xMax, yMax: values.line2.yMax, borderColor: '#27ae60', borderWidth: 3 }; } } const fontSize = appGlobalSettings.charts.correctedFontSize; 
+    createManagedChart(canvasId, { type: 'scatter', data: { datasets: [{ label: '打撃貫入曲線', data: points, borderColor: '#3498db', backgroundColor: '#3498db', showLine: true, pointRadius: 5, pointHoverRadius: 7 }] }, options: { responsive: true, maintainAspectRatio: false, animation: { duration: 0 }, scales: { x: { title: { display: true, text: '累積回数数 (回)', font: { size: fontSize } }, beginAtZero: true, suggestedMax: Math.max(60, cumulativeCount + 10), ticks: { font: { size: fontSize } } }, y: { title: { display: true, text: '累積貫入量 (cm)', font: { size: fontSize } }, reverse: true, beginAtZero: true, max: Math.max(35, cumulativePen + 5), ticks: { font: { size: fontSize } } } }, plugins: { legend: { display: false }, tooltip: { callbacks: { label: (ctx) => `打撃: ${ctx.raw.x}回, 貫入: ${ctx.raw.y}cm` } }, annotation: { annotations } }, onHover: (event, chartElement) => { event.native.target.style.cursor = chartElement.length ? 'crosshair' : 'default'; }, onClick: (event, elements) => { const chart = event.chart; if (!correctionState.isSelecting || chart.canvas.id.replace('corrected-chart-', '') !== correctionState.testDataId) return; if (elements.length === 0) { alert('データ点をクリックしてください。'); return; } const clickedPoint = elements[0]; const pointData = chart.data.datasets[clickedPoint.datasetIndex].data[clickedPoint.index]; const instructionEl = document.getElementById(`instruction-${correctionState.testDataId}`); if (!correctionState.startPoint) { correctionState.startPoint = pointData; if (instructionEl) { instructionEl.innerHTML = `始点: <b>${pointData.x}回, ${pointData.y}cm</b><br>これと結ぶ【終点】をクリックしてください (ESCでキャンセル)`; instructionEl.style.backgroundColor = "#fff3cd"; } } else { const endPoint = pointData; if (correctionState.startPoint.x === endPoint.x && correctionState.startPoint.y === endPoint.y) { alert('始点と終点に同じ点を選択できません。'); return; } const deltaX = endPoint.x - correctionState.startPoint.x; const deltaY = endPoint.y - correctionState.startPoint.y; if (Math.abs(deltaY) < 1) { alert('貫入量がほぼ同じ点は選択できません。'); correctionState.startPoint = null; if (instructionEl) { instructionEl.textContent = `【始点】を選択し直してください...`; instructionEl.style.backgroundColor = "#fef2f2"; } return; } const correctedN = 30 * (deltaX / deltaY); const lineData = { xMin: correctionState.startPoint.x, yMin: correctionState.startPoint.y, xMax: endPoint.x, yMax: endPoint.y }; if (!correctedNValues[correctionState.testDataId]) correctedNValues[correctionState.testDataId] = {}; correctedNValues[correctionState.testDataId][`val${correctionState.lineIndex}`] = correctedN; correctedNValues[correctionState.testDataId][`line${correctionState.lineIndex}`] = lineData; document.getElementById(chart.canvas.id).classList.remove('selectable-chart'); if (instructionEl) { instructionEl.textContent = `補正N値を算出しました！`; instructionEl.style.backgroundColor = "#fef2f2"; } setTimeout(() => { if (instructionEl) instructionEl.textContent = ''; }, 2500); document.getElementById('correctionBanner').style.display = 'none'; correctionState = { isSelecting: false, testDataId: null, lineIndex: null, startPoint: null }; renderAllForSelectedHoles(); } } } }); 
+    }
+    
+    function startCorrection(testDataId, lineIndex) { if (correctionState.isSelecting) { alert('現在、別の補正線を選択中です。'); return; } correctionState = { isSelecting: true, testDataId, lineIndex, startPoint: null }; document.querySelectorAll('.selectable-chart').forEach(c => c.classList.remove('selectable-chart')); document.querySelectorAll('.correction-instruction-text').forEach(el => el.textContent = ''); const canvas = document.getElementById(`corrected-chart-${testDataId}`); if(canvas) canvas.classList.add('selectable-chart'); const instructionEl = document.getElementById(`instruction-${testDataId}`); if(instructionEl) instructionEl.textContent = `グラフ上のデータ点をクリックして【始点】を選択してください...`; document.getElementById('correctionBanner').style.display = 'flex'; }
+    function resetCorrection(testDataId) { if (!testDataId && correctionState.testDataId) testDataId = correctionState.testDataId; if (correctedNValues[testDataId] && !correctionState.isSelecting) { delete correctedNValues[testDataId]; renderAllForSelectedHoles(); } const instructionEl = document.getElementById(`instruction-${testDataId}`); if (instructionEl) instructionEl.textContent = ''; if (correctionState.isSelecting) { correctionState = { isSelecting: false, testDataId: null, lineIndex: null, startPoint: null }; const canvas = document.getElementById(`corrected-chart-${testDataId}`); if(canvas) canvas.classList.remove('selectable-chart'); document.getElementById('correctionBanner').style.display = 'none'; } }
+    function handleSoilSymbolChange(testDataId, lineIndex, selectedSymbol) { if (!correctedNValues[testDataId]) correctedNValues[testDataId] = {}; correctedNValues[testDataId][`symbol${lineIndex}`] = selectedSymbol; renderAllForSelectedHoles(); }
+    
+    function renderLayerSummaryView() {
+        const selector = document.getElementById('layerSelector');
+        const summaryContent = document.getElementById('summaryContent'); 
+        if (selector.options.length === 0 || selector.value === '') { summaryContent.innerHTML = '<p style="text-align:center;">データがありません。</p>'; return; } 
+        const selectedSymbol = selector.value; 
+        let combinedData = []; selectedBoringHoles.forEach(holeId => { if (allBoringData[holeId]) combinedData.push(...allBoringData[holeId].data); }); 
+        const allProcessedData = getProcessedDataForStatistics(combinedData); 
+        const selectedLayerData = allProcessedData.filter(d => (d.soil_symbol === selectedSymbol || d.rock_symbol === selectedSymbol)); 
+        const otherLayersData = allProcessedData.filter(d => (d.soil_symbol !== selectedSymbol && d.rock_symbol !== selectedSymbol)); 
+        
+        if (selectedLayerData.length === 0) { document.getElementById('summaryStatisticsTable').innerHTML = ''; document.getElementById('summaryDataTable').innerHTML = ''; alert(`選択された土層「${selectedSymbol}」のデータはありません。`); return; } 
+        
+        renderSummaryStatisticsTable(selectedLayerData.filter(item => !excludedPoints.has(item.id)), selectedSymbol); 
+        renderSummaryVisuals(selectedLayerData, selectedSymbol); 
+        renderSummaryCorrelationCharts(selectedLayerData, otherLayersData, selectedSymbol); 
+        createTable(selectedLayerData, 'summaryDataTable'); 
+
+        const descContainer = document.getElementById('layerDescriptionContainer');
+        if (descContainer) descContainer.style.display = 'none';
+    }
+    
+    function renderSummaryStatisticsTable(data, symbol) { renderStatisticsTable('summaryStatisticsTable', data); }
+    function renderSummaryVisuals(data, symbol) {
+        if (chartInstances['summarySpecialValueChart']) chartInstances['summarySpecialValueChart'].destroy();
+        const style = getOrCreateSoilStyle(symbol);
+        const isRock = data.some(d => d.rock_symbol || d.rock_type);
+        const n_cap = isRock ? APP_CONSTANTS.N_CAP.ROCK : (calculationStandard === 'civil' ? APP_CONSTANTS.N_CAP.CIVIL_SOIL : architecturalSoilNCap);
+        const x_max = n_cap + 10;
+        const legendSuffix = excludedPoints.size > 0 ? ' (特異値除外後)' : '';
+        const nValuesData = data.map(item => { const n_hits = item.isCorrectedValue ? item.correctedNValue : getTotalN(item); const pen = item.isCorrectedValue ? APP_CONSTANTS.CALC.PENETRATION_LIMIT : getTotalPenetration(item); return { n: Math.min(calculateConvertedN(n_hits, pen), n_cap), item: item }; });
+        const individualPoints = nValuesData.map(d => ({ x: d.n, y: symbol, originalItem: d.item }));
+        const outlierCircles = nValuesData.filter(d => excludedPoints.has(d.item.id)).map(d => ({ x: d.n, y: symbol, originalItem: d.item }));
+        const filteredNValues = nValuesData.filter(d => !excludedPoints.has(d.item.id)).map(d => d.n);
+        let averages = [], representatives = [];
+        if (filteredNValues.length > 0) { const mean = filteredNValues.reduce((a, b) => a + b, 0) / filteredNValues.length; averages.push({ x: mean, y: symbol }); let stdDev = 0; if (filteredNValues.length > 1) stdDev = Math.sqrt(filteredNValues.map(x => Math.pow(x - mean, 2)).reduce((a, b) => a + b) / (filteredNValues.length - 1)); const variationCoeff = mean !== 0 ? stdDev / mean : 0; let representativeN = (stdDev <= 1 || (stdDev > 1 && variationCoeff <= 0.2)) ? mean : mean - (stdDev / 2); if (representativeN < 0) representativeN = 0; representatives.push({ x: parseFloat(getRoundedRepresentativeN(representativeN)), y: symbol }); }
+        const specialMarkerSize = appGlobalSettings.summary.specialMarkerSize;
+        const datasets = [{ type: 'scatter', label: 'N値', data: individualPoints, pointStyle: 'rect', backgroundColor: 'black', radius: specialMarkerSize }, { type: 'scatter', label: '平均N値' + legendSuffix, data: averages, pointStyle: 'circle', backgroundColor: 'red', radius: specialMarkerSize * 1.3, borderColor: 'darkred', borderWidth: 2 }, { type: 'scatter', label: '代表N値' + legendSuffix, data: representatives, pointStyle: 'triangle', backgroundColor: 'lime', radius: specialMarkerSize * 1.5, borderColor: 'green', borderWidth: 2 }];
+        if (outlierCircles.length > 0) datasets.push({ type: 'scatter', label: '特異値', data: outlierCircles, pointStyle: 'circle', radius: specialMarkerSize * 1.8, backgroundColor: 'transparent', borderColor: 'black', borderWidth: 2.5 });
+        const specialFontSize = appGlobalSettings.summary.specialFontSize; const freqFontSize = appGlobalSettings.summary.freqFontSize;
+        createManagedChart('summarySpecialValueChart', { type: 'bar', data: { labels: [symbol], datasets }, options: { responsive: true, maintainAspectRatio: false, indexAxis: 'y', animation: { duration: 0 }, layout: { padding: { bottom: 30, left: 10, right: 20 } }, scales: { x: { beginAtZero: true, max: x_max, title: { display: true, text: 'N値', font: { size: specialFontSize + 2 } }, ticks: { font: { size: specialFontSize } } }, y: { ticks: { font: { size: specialFontSize } } } }, plugins: { legend: { display: true, position: 'bottom', labels: { usePointStyle: true, padding: 30, font: { size: specialFontSize } } } } } });
+        addContextMenuToChart('summarySpecialValueChart');
+        
+        if (chartInstances['summaryFrequencyChart']) chartInstances['summaryFrequencyChart'].destroy();
+        let bins; if (calculationStandard === 'civil') { bins = isRock ? FREQUENCY_BINS.civil_rock : FREQUENCY_BINS.civil_soil; } else { bins = isRock ? FREQUENCY_BINS.architectural_rock : FREQUENCY_BINS.architectural_soil; }
+        const counts = Array(bins.length).fill(0);
+        data.forEach(d => { const n = d.isCorrectedValue ? d.correctedNValue : getTotalN(d); const binIndex = bins.findIndex(b => n >= b.min && n <= b.max); if (binIndex !== -1) counts[binIndex]++; });
+        createManagedChart('summaryFrequencyChart', { type: 'bar', data: { labels: bins.map(b => b.label), datasets: [{ data: counts, backgroundColor: style.color + 'BF', borderColor: style.color, label: `${symbol} (N=${data.length})` }] }, options: { responsive: true, maintainAspectRatio: false, animation: { duration: 0 }, layout: { padding: { bottom: 30, right: 10 } }, scales: { y: { beginAtZero: true, title: { display: true, text: '頻度', font: { size: freqFontSize } }, ticks: { stepSize: 5, precision: 0, font: { size: freqFontSize } } }, x: { ticks: { font: { size: freqFontSize - 2 } } } }, plugins: { legend: { display: true, position: 'top', labels: { font: { size: freqFontSize } } }, datalabels: { anchor: 'end', align: 'top', formatter: v => v > 0 ? v : null, font: { size: freqFontSize, weight: 'bold' } } } }, plugins: [ChartDataLabels] });
+    }
+    
+    function renderSummaryCorrelationCharts(selectedData, otherData, symbol) {
+        ['summaryDepthChart', 'summaryElevChart'].forEach(id => { if (chartInstances[id]) chartInstances[id].destroy(); });
+        const style = getOrCreateSoilStyle(symbol);
+        const isRock = selectedData.some(d => d.rock_symbol || d.rock_type);
+        const n_cap = isRock ? APP_CONSTANTS.N_CAP.ROCK : (calculationStandard === 'civil' ? APP_CONSTANTS.N_CAP.CIVIL_SOIL : architecturalSoilNCap);
+        const fontSize = appGlobalSettings.summary.correlationFontSize; const markerSize = appGlobalSettings.summary.correlationMarkerSize;
+        const createChart = (canvasId, yAxisType) => {
+            const mapData = (d) => { const item_is_rock = !!(d.rock_symbol || d.rock_type); const item_n_cap = item_is_rock ? APP_CONSTANTS.N_CAP.ROCK : (calculationStandard === 'civil' ? APP_CONSTANTS.N_CAP.CIVIL_SOIL : architecturalSoilNCap); const n = d.isCorrectedValue ? d.correctedNValue : getTotalN(d); const pen = d.isCorrectedValue ? APP_CONSTANTS.CALC.PENETRATION_LIMIT : getTotalPenetration(d); const cappedN = Math.min(calculateConvertedN(n, pen), item_n_cap); const holeElevation = allBoringData[d.boring_hole]?.elevation; const yValue = yAxisType === 'depth' ? (d.depth_start + d.depth_end) / 2 : (holeElevation !== null ? holeElevation - (d.depth_start + d.depth_end) / 2 : null); return { x: cappedN, y: yValue, originalItem: d }; };
+            const otherPoints = otherData.map(d => mapData(d)).filter(p => p.y !== null);
+            const currentLayerPoints = selectedData.map(d => mapData(d)).filter(p => p.y !== null);
+            const outlierPoints = []; selectedData.forEach(d => { if (excludedPoints.has(d.id)) { const p = mapData(d); if (p.y !== null) outlierPoints.push(p); } });
+            const datasets = [ { label: 'その他の土層', data: otherPoints, backgroundColor: 'rgba(200, 200, 200, 0.5)', pointStyle: 'circle', radius: Math.max(2, markerSize - 2), order: 3 }, { label: symbol, data: currentLayerPoints, backgroundColor: style.color, pointStyle: style.marker, radius: markerSize, borderColor: '#000', borderWidth: 1.5, order: 2 } ];
+            if (outlierPoints.length > 0) { datasets.push({ label: '特異値', data: outlierPoints, pointStyle: 'circle', radius: markerSize * 1.5, backgroundColor: 'transparent', borderColor: 'black', borderWidth: 2.5, order: 1 }); }
+            const yAxisOptions = yAxisType === 'depth' ? { title: { display: true, text: '深度 (m)', font: { size: fontSize } }, reverse: true, ticks: { font: { size: fontSize + 2 } } } : { title: { display: true, text: '標高 (m)', font: { size: fontSize } }, ticks: { font: { size: fontSize + 2 } } };
+            const options = { responsive: true, maintainAspectRatio: false, animation: { duration: 0 }, layout: { padding: { bottom: 20, right: 10 } }, scales: { x: { beginAtZero: true, max: n_cap + 10, title: { display: true, text: 'N値', font: { size: fontSize + 2 } }, ticks: { font: { size: fontSize + 2 } } }, y: yAxisOptions }, plugins: { legend: { display: true, position: 'bottom', labels: { usePointStyle: true, font: { size: fontSize } } }, tooltip: { callbacks: { label: function(context) { const item = context.raw.originalItem; let label = `${item.boring_hole} (${item.depth_start}m)`; if (context.dataset.label === '特異値') label = `特異値: ${label}`; return `${label}: N=${context.raw.x.toFixed(2)}`; } } } } };
+            createManagedChart(canvasId, { type: 'scatter', data: { datasets }, options });
+            addContextMenuToChart(canvasId);
+        };
+        createChart('summaryDepthChart', 'depth'); createChart('summaryElevChart', 'elevation');
+    } 
+
+    function openLayerArticleSettingsModal() {
+        const tableBody = document.querySelector('#layerArticleSettingsTable tbody');
+        tableBody.innerHTML = '';
+        let allData = [];
+        selectedBoringHoles.forEach(h => { if(allBoringData[h]) allData.push(...allBoringData[h].data); });
+        const allProcessedData = getProcessedDataForStatistics(allData);
+        const presentSymbols = [...new Set(allProcessedData.map(d => d.soil_symbol || d.rock_symbol))].filter(s => s);
+        presentSymbols.sort((a,b) => (soilStyleSettings[a]?.order||99) - (soilStyleSettings[b]?.order||99));
+        if (presentSymbols.length === 0) {
+            tableBody.innerHTML = '<tr><td colspan="7">データがありません</td></tr>';
+        }
+        presentSymbols.forEach(symbol => {
+            if (!layerArticleSettings[symbol]) {
+                layerArticleSettings[symbol] = { depth: true, age: true, n_stats: true, state: true, trend: true, notes: true };
+            }
+            const s = layerArticleSettings[symbol];
+            const style = soilStyleSettings[symbol] || { color: '#fff' };
+            const tr = document.createElement('tr');
+            tr.style.backgroundColor = style.color + '20'; 
+            tr.innerHTML = `
+                <td style="font-weight:bold; text-align:left; padding:5px 10px;">
+                    <span style="display:inline-block; width:12px; height:12px; background:${style.color}; border:1px solid #999; margin-right:5px;"></span>
+                    ${symbol}
+                </td>
+                <td><input type="checkbox" class="chk-depth" data-symbol="${symbol}" ${s.depth ? 'checked' : ''}></td>
+                <td><input type="checkbox" class="chk-age" data-symbol="${symbol}" ${s.age ? 'checked' : ''}></td>
+                <td><input type="checkbox" class="chk-n_stats" data-symbol="${symbol}" ${s.n_stats ? 'checked' : ''}></td>
+                <td><input type="checkbox" class="chk-state" data-symbol="${symbol}" ${s.state ? 'checked' : ''}></td>
+                <td><input type="checkbox" class="chk-trend" data-symbol="${symbol}" ${s.trend ? 'checked' : ''}></td>
+                <td><input type="checkbox" class="chk-notes" data-symbol="${symbol}" ${s.notes ? 'checked' : ''}></td>
+            `;
+            tableBody.appendChild(tr);
+        });
+        document.getElementById('layerArticleSettingsModal').style.display = 'block';
+    }
+
+    function closeLayerArticleSettingsModal() { document.getElementById('layerArticleSettingsModal').style.display = 'none'; }
+    function toggleArticleColumn(colType, isChecked) {
+        const checkboxes = document.querySelectorAll(`#layerArticleSettingsTable .chk-${colType}`);
+        checkboxes.forEach(chk => chk.checked = isChecked);
+    }
+    function applyLayerArticleSettings() {
+        const rows = document.querySelectorAll('#layerArticleSettingsTable tbody tr');
+        rows.forEach(row => {
+            const symbol = row.querySelector('.chk-depth').dataset.symbol;
+            if (!layerArticleSettings[symbol]) layerArticleSettings[symbol] = {};
+            layerArticleSettings[symbol].depth = row.querySelector('.chk-depth').checked;
+            layerArticleSettings[symbol].age = row.querySelector('.chk-age').checked;
+            layerArticleSettings[symbol].n_stats = row.querySelector('.chk-n_stats').checked;
+            layerArticleSettings[symbol].state = row.querySelector('.chk-state').checked;
+            layerArticleSettings[symbol].trend = row.querySelector('.chk-trend').checked;
+            layerArticleSettings[symbol].notes = row.querySelector('.chk-notes').checked;
+        });
+        closeLayerArticleSettingsModal();
+        generateAllLayerArticles(); 
+    }
+
+    function generateAllLayerArticles() {
+        const container = document.getElementById('articlesContainer');
+        container.innerHTML = '';
+        let allData = [];
+        selectedBoringHoles.forEach(h => { if(allBoringData[h]) allData.push(...allBoringData[h].data); });
+        const allProcessedData = getProcessedDataForStatistics(allData);
+        const presentSymbols = [...new Set(allProcessedData.map(d => d.soil_symbol || d.rock_symbol))].filter(s => s);
+        presentSymbols.sort((a,b) => (soilStyleSettings[a]?.order||99) - (soilStyleSettings[b]?.order||99));
+        if (presentSymbols.length === 0) { container.innerHTML = '<p>データがありません。</p>'; return; }
+        presentSymbols.forEach(symbol => {
+            const layerData = allProcessedData.filter(d => (d.soil_symbol === symbol || d.rock_symbol === symbol) && !excludedPoints.has(d.id));
+            if (layerData.length === 0) return;
+            const options = layerArticleSettings[symbol] || { depth: true, age: true, n_stats: true, state: true, trend: true, notes: true };
+            const articleText = generateAdvancedArticle(symbol, layerData, options);
+            const style = soilStyleSettings[symbol] || { color:'#ccc' };
+            const titleColor = style.color;
+            let nVals = [];
+            layerData.forEach(d => {
+                const n_hits = d.isCorrectedValue ? d.correctedNValue : getTotalN(d);
+                const pen = d.isCorrectedValue ? APP_CONSTANTS.CALC.PENETRATION_LIMIT : getTotalPenetration(d);
+                const isRock = (d.rock_symbol || d.rock_type);
+                const limit = isRock ? 300 : (calculationStandard === 'civil' ? 50 : architecturalSoilNCap);
+                const val = Math.min(calculateConvertedN(n_hits, pen), limit);
+                if(!isNaN(val)) nVals.push(val);
+            });
+            const mean = nVals.length > 0 ? (nVals.reduce((a,b)=>a+b,0)/nVals.length).toFixed(1) : '-';
+            const articleDiv = document.createElement('div');
+            articleDiv.className = 'article-box';
+            const displayBody = articleText.replace(/^【地層：.*】\n?/, '');
+            articleDiv.innerHTML = `
+                <div class="article-header" style="border-bottom-color: ${titleColor};">
+                    <h3 style="color:${titleColor}; filter: brightness(0.8);">${symbol}</h3>
+                    <span style="font-size:12px; color:#666;">データ数: ${layerData.length}</span>
+                </div>
+                <div class="article-stats">
+                    <div class="article-stat-item"><strong>区分</strong><span>${SOIL_CLASSIFICATIONS[style.classification]||'-'}</span></div>
+                    <div class="article-stat-item"><strong>時代</strong><span>${GEO_AGES[style.geoAge]||'-'}</span></div>
+                    <div class="article-stat-item"><strong>平均N値</strong><span>${mean}</span></div>
+                </div>
+                <div class="article-content">
+                    <textarea>${displayBody}</textarea>
+                </div>
+            `;
+            container.appendChild(articleDiv);
+        });
+    }
+
+    function applySharpenToCanvas(canvas, amount = 0.5) { const ctx = canvas.getContext('2d'); const w = canvas.width; const h = canvas.height; const imgData = ctx.getImageData(0, 0, w, h); const data = imgData.data; const output = ctx.createImageData(w, h); const dst = output.data; const x = amount; const w_center = 1 + 4 * x; const w_neighbor = -x; for (let y = 0; y < h; y++) { for (let x = 0; x < w; x++) { const dstOff = (y * w + x) * 4; for (let c = 0; c < 3; c++) { const val = data[dstOff + c]; const n_up = (y > 0) ? data[((y - 1) * w + x) * 4 + c] : val; const n_down = (y < h - 1) ? data[((y + 1) * w + x) * 4 + c] : val; const n_left = (x > 0) ? data[(y * w + (x - 1)) * 4 + c] : val; const n_right = (x < w - 1) ? data[(y * w + (x + 1)) * 4 + c] : val; let newVal = (val * w_center) + ((n_up + n_down + n_left + n_right) * w_neighbor); if (newVal < 0) newVal = 0; if (newVal > 255) newVal = 255; dst[dstOff + c] = newVal; } dst[dstOff + 3] = data[dstOff + 3]; } } ctx.putImageData(output, 0, 0); return canvas; }
+    function getExportScale() { return parseInt(appGlobalSettings.general.exportQuality) || 2; }
+    function html2canvasWithFonts(element, options) { return html2canvas(element, { ...options, onclone: (clonedDoc) => { const target = clonedDoc.getElementById(element.id); if (target) { target.style.fontFamily = EXPORT_FONT_FAMILY; const textElements = target.querySelectorAll('*'); textElements.forEach(el => { if (window.getComputedStyle(el).fontFamily !== '') { el.style.fontFamily = EXPORT_FONT_FAMILY; } }); } } }); }
+
+    async function exportChart(chartId) { const chart = chartInstances[chartId]; if (!chart) { alert('グラフなし'); return; } let title = `Chart_${chartId}`; try { title = document.querySelector(`canvas#${chartId}`).closest('.chart-wrapper, .chart-box').querySelector('h2, h4').innerText; } catch (e) {} const resolution = getExportScale(); const originalBgColor = chart.options.plugins.backgroundColor; let originalRatio; try { chart.options.plugins.backgroundColor = 'white'; originalRatio = await setChartResolution(chart, resolution); const a = document.createElement('a'); a.href = chart.toBase64Image('image/png', 1.0); a.download = `${title.replace(/[/\\?%*:|"<>]/g, '-')}.png`; a.click(); } catch (err) { console.error(err); } finally { if (chart && originalRatio) { chart.options.plugins.backgroundColor = originalBgColor; await setChartResolution(chart, originalRatio); } } }
+    async function exportCorrectedNChartToPNG(testDataId) { const chartBox = document.getElementById(`box-${testDataId}`); if (!chartBox) return; const controlsToHide = chartBox.querySelectorAll('.export-btn, .correction-instruction-text, .reset-button-container, .correction-controls-wrapper button, .correction-controls-wrapper select'); try { controlsToHide.forEach(el => el.style.display = 'none'); const scale = getExportScale(); const canvas = await html2canvasWithFonts(chartBox, { scale: scale, backgroundColor: '#ffffff', useCORS: true }); const titleElement = chartBox.querySelector('h4'); const filename = titleElement ? `補正N値グラフ_${titleElement.innerText.replace(/[/\\?%*:|"<>]/g, '-')}.png` : 'Corrected-N-Chart.png'; const dataUrl = canvas.toDataURL('image/png'); const a = document.createElement('a'); a.href = dataUrl; a.download = filename; document.body.appendChild(a); a.click(); document.body.removeChild(a); } catch (err) { console.error(err); } finally { controlsToHide.forEach(el => el.style.display = ''); } }
+    function exportTableToCSV(tableId, filename) { const table = document.getElementById(tableId); if (!table) return; const BOM = new Uint8Array([0xEF, 0xBB, 0xBF]); let csv = []; const rows = table.querySelectorAll("tr"); for (const row of rows) { let row_data = []; const cols = row.querySelectorAll("td, th"); for (const col of cols) { let data = col.innerText.replace(/(\r\n|\n|\r)/gm, " ").replace(/"/g, '""'); if (data.includes(',')) { data = `"${data}"`; } const colspan = col.getAttribute('colspan') || 1; row_data.push(data); for (let i = 1; i < colspan; i++) { row_data.push(''); } } csv.push(row_data.join(",")); } const csv_string = csv.join("\n"); const blob = new Blob([BOM, csv_string], { type: 'text/csv;charset=utf-8;' }); const url = URL.createObjectURL(blob); const a = document.createElement("a"); a.setAttribute("href", url); a.setAttribute("download", filename); a.style.display = 'none'; document.body.appendChild(a); a.click(); document.body.removeChild(a); URL.revokeObjectURL(url); }
+    async function exportTableToPNG(tableId, filename) { const table = document.getElementById(tableId); if (!table) return; try { const scale = getExportScale(); const canvas = await html2canvasWithFonts(table, { scale: scale, backgroundColor: '#ffffff', useCORS: true }); const dataUrl = canvas.toDataURL('image/png'); const a = document.createElement('a'); a.href = dataUrl; a.download = filename; document.body.appendChild(a); a.click(); document.body.removeChild(a); } catch (err) { console.error(err); } }
+
+    async function addLayerSummaryToPres(pres, selectedSymbol) {
+        const scale = getExportScale(); let slide = pres.addSlide(); slide.addText(`地層別総括: ${selectedSymbol}`, { x: 0.25, y: 0.1, w: 7.77, h: 0.4, fontSize: 24, bold: true, align: 'center' }); let y_pos = 0.6; const margin = 0.25; const slideWidth = 8.27 - (margin * 2);
+        const cleanTextForExport = (element) => { const h3s = element.querySelectorAll('h3'); h3s.forEach(h3 => { h3.dataset.originalText = h3.innerText; h3.innerText = h3.innerText.replace(/\s*\(.*右クリック.*\)/, '').replace(/\s*\(.*選択層.*\)/, ''); }); }; 
+        const restoreTextAfterExport = (element) => { const h3s = element.querySelectorAll('h3'); h3s.forEach(h3 => { if (h3.dataset.originalText) { h3.innerText = h3.dataset.originalText; delete h3.dataset.originalText; } }); }; 
+        const toggleButtons = (element, show) => { element.querySelectorAll('.btn-sm, .export-btn').forEach(b => { b.style.visibility = show ? 'visible' : 'hidden'; }); };
+        const sections = [ { id: 'summaryStatisticsContainer', type: 'simple' }, { id: 'summaryCorrelationContainer', type: 'simple' }, { id: 'summaryVisualsContainer', type: 'visuals' }, { id: 'summaryTableContainer', type: 'simple' } ];
+        for (const section of sections) { const element = document.getElementById(section.id); if (!element || element.style.display === 'none') continue; cleanTextForExport(element); toggleButtons(element, false); try { if (section.type === 'visuals') { const titleText = element.querySelector('h3').innerText; const wrapper1 = document.getElementById('summarySpecialValueWrapper'); const wrapper2 = document.getElementById('summaryFrequencyWrapper'); if (y_pos + 0.4 > 11.2) { slide = pres.addSlide(); y_pos = 0.25; } slide.addText(titleText, { x: margin, y: y_pos, w: slideWidth, h: 0.3, fontSize: 16, bold: true }); y_pos += 0.35; const canvas1 = await html2canvasWithFonts(wrapper1, { scale: scale, backgroundColor: '#ffffff' }); const canvas2 = await html2canvasWithFonts(wrapper2, { scale: scale, backgroundColor: '#ffffff' }); applySharpenToCanvas(canvas1, 0.8); applySharpenToCanvas(canvas2, 0.8); const img_w = slideWidth / 2 - 0.05; const aspect1 = canvas1.height / canvas1.width; const aspect2 = canvas2.height / canvas2.width; const img_h1 = img_w * aspect1; const img_h2 = img_w * aspect2; const max_h = Math.max(img_h1, img_h2); if (y_pos + max_h > 11.2) { slide = pres.addSlide(); slide.addText(titleText + " (続き)", { x: margin, y: 0.25, w: slideWidth, h: 0.3, fontSize: 16, bold: true }); slide.addImage({ data: canvas1.toDataURL('image/png'), x: margin, y: 0.6, w: img_w, h: img_h1 }); slide.addImage({ data: canvas2.toDataURL('image/png'), x: margin + img_w + 0.1, y: 0.6, w: img_w, h: img_h2 }); y_pos = 0.6 + max_h + 0.2; } else { slide.addImage({ data: canvas1.toDataURL('image/png'), x: margin, y: y_pos, w: img_w, h: img_h1 }); slide.addImage({ data: canvas2.toDataURL('image/png'), x: margin + img_w + 0.1, y: y_pos, w: img_w, h: img_h2 }); y_pos += max_h + 0.2; } } else { const canvas = await html2canvasWithFonts(element, { scale: scale, backgroundColor: '#ffffff' }); applySharpenToCanvas(canvas, 0.5); const dataUrl = canvas.toDataURL('image/png'); const aspectRatio = canvas.height / canvas.width; const img_h = slideWidth * aspectRatio; if (y_pos + img_h > 11.2) { slide = pres.addSlide(); y_pos = 0.25; } slide.addImage({ data: dataUrl, x: margin, y: y_pos, w: slideWidth, h: img_h }); y_pos += img_h + 0.2; } } catch (err) { console.error(err); } finally { restoreTextAfterExport(element); toggleButtons(element, true); } }
+    }
+
+    async function exportSummaryToPPTX() { const selectedSymbol = document.getElementById('layerSelector').value; if (!selectedSymbol) { alert('土層が選択されていません。'); return; } const pres = new PptxGenJS(); pres.defineLayout({ name: "A4_PORTRAIT", width: 8.27, height: 11.69 }); pres.layout = "A4_PORTRAIT"; alert('PPTX生成中...'); try { await addLayerSummaryToPres(pres, selectedSymbol); pres.writeFile({ fileName: `Summary_${selectedSymbol}.pptx` }); } catch(err) { console.error(err); alert('出力失敗'); } }
+    async function exportAllLayersSummaryToPPTX() { const selector = document.getElementById('layerSelector'); const options = Array.from(selector.options).map(o => o.value); if (options.length === 0) return; if (!confirm(`全${options.length}層の総括資料を一括作成します。よろしいですか？`)) return; const pres = new PptxGenJS(); pres.defineLayout({ name: "A4_PORTRAIT", width: 8.27, height: 11.69 }); pres.layout = "A4_PORTRAIT"; const originalValue = selector.value; const btn = event.target; btn.innerText = "⏳ 処理中..."; btn.disabled = true; try { for (let i = 0; i < options.length; i++) { const symbol = options[i]; selector.value = symbol; renderLayerSummaryView(); await new Promise(resolve => setTimeout(resolve, 600)); await addLayerSummaryToPres(pres, symbol); } const dateStr = new Date().toISOString().slice(0, 10).replace(/-/g, ''); pres.writeFile({ fileName: `LayerSummary_All_${dateStr}.pptx` }); alert('完了しました。'); } catch(err) { console.error(err); alert('エラー発生'); } finally { selector.value = originalValue; renderLayerSummaryView(); btn.innerText = "📚 全土層一括PPTX"; btn.disabled = false; } }
+    async function exportCorrectedNChartsToPPTX() { const grid = document.getElementById('correctedNChartsGrid'); const items = Array.from(grid.querySelectorAll('.corrected-chart-box')); if (items.length === 0) { alert('グラフなし'); return; } const layoutValue = appGlobalSettings.general.freqLayout; let cols, rows, chartsPerPage; if (layoutValue.includes('_all')) { cols = parseInt(layoutValue.split('x')[0], 10); chartsPerPage = items.length; rows = Math.ceil(items.length / cols); } else { const layout = layoutValue.split('x').map(Number); cols = layout[0]; rows = layout[1]; chartsPerPage = cols * rows; } const scale = getExportScale(); const pres = new PptxGenJS(); pres.defineLayout({ name: "A4_PORTRAIT", width: 8.27, height: 11.69 }); pres.layout = "A4_PORTRAIT"; alert('PPTX生成中...'); try { for (let i = 0; i < items.length; i += chartsPerPage) { const slide = pres.addSlide(); const chunk = items.slice(i, i + chartsPerPage); const margin = 0.25; const slideW = 8.27 - (margin * 2); const chartCellW = slideW / cols; let yTracker = {}; for (let c = 0; c < cols; c++) yTracker[c] = margin; for (let j = 0; j < chunk.length; j++) { const item = chunk[j]; const col = j % cols; const controlsToHide = item.querySelectorAll('.export-btn, .correction-instruction-text, .reset-button-container, .correction-controls-wrapper button, .correction-controls-wrapper select'); controlsToHide.forEach(el => el.style.display = 'none'); const canvas = await html2canvasWithFonts(item, { scale: scale, backgroundColor: '#ffffff' }); controlsToHide.forEach(el => el.style.display = ''); const dataUrl = canvas.toDataURL('image/png'); const aspectRatio = canvas.height / canvas.width; const chartCellH = chartCellW * aspectRatio; slide.addImage({ data: dataUrl, x: margin + col * chartCellW, y: yTracker[col], w: chartCellW, h: chartCellH }); yTracker[col] += chartCellH; } } pres.writeFile({ fileName: 'Corrected-N-Charts.pptx' }); } catch (err) { console.error(err); } }
+    async function exportFrequencyChartsToPPTX() { const grid = document.getElementById('frequencyChartsGrid'); const items = Array.from(grid.querySelectorAll('.freq-chart-box')); if (items.length === 0) return; const layout = appGlobalSettings.general.freqLayout.split('x').map(Number); const cols = layout[0] || 3; const rows = layout[1] || 2; const chartsPerPage = cols * rows; const scale = getExportScale(); const pres = new PptxGenJS(); pres.defineLayout({ name: "A4_PORTRAIT", width: 8.27, height: 11.69 }); pres.layout = "A4_PORTRAIT"; alert('PPTX生成中...'); try { for (let i = 0; i < items.length; i += chartsPerPage) { const slide = pres.addSlide(); const chunk = items.slice(i, i + chartsPerPage); const margin = 0.25; const slideW = 8.27 - (margin * 2); const chartCellW = slideW / cols; let yTracker = {}; for (let c = 0; c < cols; c++) yTracker[c] = margin; for (let j = 0; j < chunk.length; j++) { const item = chunk[j]; const col = j % cols; const canvas = await html2canvasWithFonts(item, { scale: scale, backgroundColor: '#ffffff' }); const dataUrl = canvas.toDataURL('image/png'); const aspectRatio = canvas.height / canvas.width; const chartCellH = chartCellW * aspectRatio; slide.addImage({ data: dataUrl, x: margin + col * chartCellW, y: yTracker[col], w: chartCellW, h: chartCellH }); yTracker[col] += chartCellH; } } pres.writeFile({ fileName: 'N-value_frequency.pptx' }); } catch(err) { console.error(err); } }
+    async function exportTableToPPTX(tableId, filename) { const originalTable = document.getElementById(tableId); if (!originalTable) return; const pres = new PptxGenJS(); pres.defineLayout({ name: "A4_PORTRAIT", width: 8.27, height: 11.69 }); pres.layout = "A4_PORTRAIT"; const scale = getExportScale(); const header = originalTable.querySelector('thead'); const rows = Array.from(originalTable.querySelector('tbody').rows); const splitThreshold = 35; alert('PPTX生成中...'); const processTableChunk = async (tableElement) => { const tempContainer = document.createElement('div'); tempContainer.style.position = 'absolute'; tempContainer.style.left = '-9999px'; tempContainer.style.top = '0'; document.body.appendChild(tempContainer); const tableClone = tableElement.cloneNode(true); tempContainer.appendChild(tableClone); tableClone.querySelectorAll('th, td').forEach(cell => { cell.style.color = '#000000'; cell.style.border = '1px solid #000000'; }); tableClone.querySelector('thead').style.backgroundColor = '#FFFFFF'; try { return await html2canvasWithFonts(tableClone, { scale: scale, backgroundColor: '#ffffff' }); } catch (err) { return null; } finally { document.body.removeChild(tempContainer); } }; try { if (rows.length === 0) return; const chunks = rows.length > splitThreshold ? Array.from({ length: Math.ceil(rows.length / splitThreshold) }, (v, i) => rows.slice(i * splitThreshold, i * splitThreshold + splitThreshold)) : [rows]; for (const chunk of chunks) { const tableToProcess = document.createElement('table'); tableToProcess.appendChild(header.cloneNode(true)); const tempTbody = document.createElement('tbody'); chunk.forEach(row => tempTbody.appendChild(row.cloneNode(true))); tableToProcess.appendChild(tempTbody); tableToProcess.style.width = originalTable.offsetWidth + 'px'; tableToProcess.style.borderCollapse = 'collapse'; tableToProcess.style.fontSize = '13px'; tableToProcess.style.whiteSpace = 'nowrap'; const canvas = await processTableChunk(tableToProcess); if (canvas) { const dataUrl = canvas.toDataURL('image/png'); const slide = pres.addSlide(); const slideW = 7.77; const aspectRatio = canvas.height / canvas.width; const imageH = slideW * aspectRatio; const yPos = (11.69 - imageH) / 2; slide.addImage({ data: dataUrl, x: 0.25, y: yPos > 0.25 ? yPos : 0.25, w: slideW, h: imageH }); } await new Promise(resolve => setTimeout(resolve, 100)); } pres.writeFile({ fileName: filename }); } catch (err) { console.error(err); } }
+    async function exportCorrelationChartsToPPTX() { const chartIds = ['chartDepthSoil', 'chartElevSoil', 'chartDepthRock', 'chartElevRock']; const pres = new PptxGenJS(); pres.defineLayout({ name: "A4_PORTRAIT", width: 8.27, height: 11.69 }); pres.layout = "A4_PORTRAIT"; const resolution = getExportScale(); alert('PPTX生成中...'); let chart, originalBgColor, originalRatio; try { for (const chartId of chartIds) { chart = chartInstances[chartId]; if (chart) { const slide = pres.addSlide(); const title = document.querySelector(`canvas#${chartId}`).closest('.chart-box').querySelector('h2').innerText; slide.addText(title, { x: 0.25, y: 0.25, w: 7.77, h: 0.5, fontSize: 18, align: 'center' }); originalBgColor = chart.options.plugins.backgroundColor; chart.options.plugins.backgroundColor = 'white'; originalRatio = await setChartResolution(chart, resolution); const dataUrl = chart.toBase64Image('image/png', 1.0); const slideW = 7.77; const aspectRatio = chart.canvas.height / chart.canvas.width; const imageH = slideW * aspectRatio; const yPos = (11.69 - imageH) / 2; slide.addImage({ data: dataUrl, x: 0.25, y: yPos > 0.8 ? yPos : 0.8, w: slideW, h: imageH }); chart.options.plugins.backgroundColor = originalBgColor; await setChartResolution(chart, originalRatio); } } pres.writeFile({ fileName: 'CorrelationCharts.pptx' }); } catch (err) { console.error(err); } }
+    async function exportSpecialValueChartsToPPTX() { const chartIds = ['specialValueChartSoil', 'specialValueChartRock']; const pres = new PptxGenJS(); pres.defineLayout({ name: "A4_PORTRAIT", width: 8.27, height: 11.69 }); pres.layout = "A4_PORTRAIT"; const resolution = getExportScale(); alert('PPTX生成中...'); let chart, originalBgColor, originalRatio; try { for (const chartId of chartIds) { chart = chartInstances[chartId]; if (chart) { const slide = pres.addSlide(); const title = document.querySelector(`canvas#${chartId}`).closest('.chart-box').querySelector('h2').innerText; slide.addText(`特異値確認グラフ (${title})`, { x: 0.25, y: 0.25, w: 7.77, h: 0.5, fontSize: 18, align: 'center' }); originalBgColor = chart.options.plugins.backgroundColor; chart.options.plugins.backgroundColor = 'white'; originalRatio = await setChartResolution(chart, resolution); const dataUrl = chart.toBase64Image('image/png', 1.0); const slideW = 7.77; const aspectRatio = chart.canvas.height / chart.canvas.width; const imageH = slideW * aspectRatio; const yPos = (11.69 - imageH) / 2; slide.addImage({ data: dataUrl, x: 0.25, y: yPos > 0.8 ? yPos : 0.8, w: slideW, h: imageH }); chart.options.plugins.backgroundColor = originalBgColor; await setChartResolution(chart, originalRatio); } } pres.writeFile({ fileName: 'SpecialValueCharts.pptx' }); } catch (err) { console.error(err); } }
+
+    function getRandomColor() { return `#${Math.floor(Math.random()*16777215).toString(16).padStart(6, '0')}`; }
+    
+    function renderLegendListToUL(targetUlId) {
+        const list = document.getElementById(targetUlId); if (!list) return; list.innerHTML = ''; 
+        const symbols = Object.keys(soilStyleSettings).sort((a, b) => soilStyleSettings[a].order - soilStyleSettings[b].order); 
+        symbols.forEach(s => { 
+            if (s === '不明') return; const setting = soilStyleSettings[s]; const li = document.createElement('li'); li.className = 'style-setting-item'; li.dataset.symbol = s; li.draggable = true; 
+            let classOpts = `<option value="unknown">区分...</option>`; Object.keys(SOIL_CLASSIFICATIONS).forEach(k => { classOpts += `<option value="${k}" ${setting.classification===k?'selected':''}>${SOIL_CLASSIFICATIONS[k]}</option>`; });
+            let ageOpts = `<option value="unknown">時代...</option>`; Object.keys(GEO_AGES).forEach(k => { ageOpts += `<option value="${k}" ${setting.geoAge===k?'selected':''}>${GEO_AGES[k]}</option>`; });
+            let markerOpts = defaultMarkers.map(m => `<option value="${m}" ${m === setting.marker ? 'selected' : ''}>${markerNameMapJP[m]}</option>`).join(''); const isHidden = hiddenSymbols.has(s); 
+            li.innerHTML = `<input type="checkbox" class="visibility-toggle" ${!isHidden ? 'checked' : ''} title="表示/非表示"><span class="style-setting-item-name" title="${s}">${s}</span><input type="color" value="${setting.color}"><select class="setting-marker" style="width:100%;font-size:11px;">${markerOpts}</select><select class="setting-geo-age" style="width:100%;font-size:11px;border:1px solid #aaa;background:#fff8e1;">${ageOpts}</select><select class="setting-classification" style="width:100%;font-size:11px;border:1px solid #aaa;background:#e0f7fa;">${classOpts}</select><span style="font-size:12px;color:#aaa;">≡</span>`; 
+            li.querySelector('input[type="color"]').addEventListener('input', (e) => { if(soilStyleSettings[s]) soilStyleSettings[s].color = e.target.value; });
+            li.querySelector('.setting-marker').addEventListener('change', (e) => { if(soilStyleSettings[s]) soilStyleSettings[s].marker = e.target.value; });
+            li.querySelector('.setting-geo-age').addEventListener('change', (e) => { if(soilStyleSettings[s]) soilStyleSettings[s].geoAge = e.target.value; });
+            li.querySelector('.setting-classification').addEventListener('change', (e) => { if(soilStyleSettings[s]) soilStyleSettings[s].classification = e.target.value; });
+            li.querySelector('.visibility-toggle').addEventListener('change', (e) => { if (e.target.checked) hiddenSymbols.delete(s); else hiddenSymbols.add(s); renderAllForSelectedHoles(); });
+            list.appendChild(li); 
+        });
+        initializeDragAndDropForList(targetUlId);
+    }
+
+    function populateStyleSettingsList() { renderLegendListToUL('styleSettingsList'); }
+    function openQuickLegendModal() { renderLegendListToUL('quickLegendList'); document.getElementById('quickLegendModal').style.display = 'block'; }
+    function closeQuickLegendModal() { document.getElementById('quickLegendModal').style.display = 'none'; populateStyleSettingsList(); renderAllForSelectedHoles(); }
+    
+    function initializeDragAndDropForList(ulId) {
+        const list = document.getElementById(ulId); if(!list) return; let draggedItem = null; 
+        list.addEventListener('dragstart', (e) => { draggedItem = e.target.closest('.style-setting-item'); e.dataTransfer.effectAllowed = 'move'; }); 
+        list.addEventListener('dragover', (e) => { e.preventDefault(); const after = [...list.querySelectorAll('.style-setting-item:not(.dragging)')].reduce((c, child) => { const box = child.getBoundingClientRect(); const offset = e.clientY - box.top - box.height / 2; return (offset < 0 && offset > c.offset) ? { offset: offset, element: child } : c; }, { offset: Number.NEGATIVE_INFINITY }).element; if (after == null) { if (draggedItem) list.appendChild(draggedItem); } else { if (draggedItem) list.insertBefore(draggedItem, after); } }); 
+        list.addEventListener('dragend', () => { draggedItem = null; saveOrderFromList(ulId); }); 
+    }
+    function saveOrderFromList(ulId) { document.querySelectorAll(`#${ulId} li`).forEach((item, index) => { const s = item.dataset.symbol; if (soilStyleSettings[s]) { soilStyleSettings[s].order = index + 1; } }); }
+    function saveStyleSettings() { renderAllForSelectedHoles(); }
+    function toggleAllStyles(show) { if (show) hiddenSymbols.clear(); else Object.keys(soilStyleSettings).forEach(s => hiddenSymbols.add(s)); populateStyleSettingsList(); renderAllForSelectedHoles(); }
+    function toggleOutlierFromTable(id, isChecked) { if (isChecked) excludedPoints.add(id); else excludedPoints.delete(id); renderAllForSelectedHoles(); }
+    function deleteUnusedStyles() { if (Object.keys(allBoringData).length === 0) return; const usedSymbols = new Set(); Object.values(allBoringData).forEach(hole => { hole.data.forEach(d => { if (d.soil_symbol) usedSymbols.add(d.soil_symbol); if (d.rock_symbol) usedSymbols.add(d.rock_symbol); }); }); const currentSymbols = Object.keys(soilStyleSettings); const unusedList = currentSymbols.filter(symbol => symbol !== '不明' && !usedSymbols.has(symbol)); if (unusedList.length === 0) { alert('削除対象なし'); return; } if (!confirm(`未使用の凡例${unusedList.length}件を削除しますか？`)) return; unusedList.forEach(symbol => delete soilStyleSettings[symbol]); populateStyleSettingsList(); renderAllForSelectedHoles(); }
+    function setChartResolution(chart, resolution) { return new Promise((resolve) => { const originalRatio = chart.options.devicePixelRatio || window.devicePixelRatio || 1; chart.options.devicePixelRatio = resolution; chart.resize(); setTimeout(() => { resolve(originalRatio); }, 250); }); }
+    function saveState() { try { const state = { gridData: hot_data.getSourceData(), elevationData: hot_elev.getSourceData(), styleGridData: hot_style.getSourceData(), styleSettings: soilStyleSettings, calculationStandard: calculationStandard, penetrationInterval: penetrationInterval, selectedBoringHoles: selectedBoringHoles, excludedPoints: Array.from(excludedPoints), correctedNValues: correctedNValues, architecturalSoilNCap: architecturalSoilNCap, hiddenSymbols: Array.from(hiddenSymbols), appGlobalSettings: appGlobalSettings, layerArticleSettings: layerArticleSettings }; const blob = new Blob([JSON.stringify(state, null, 2)], {type: 'application/json'}); const a = document.createElement('a'); a.href = URL.createObjectURL(blob); const dateStr = new Date().toISOString().slice(0, 10).replace(/-/g, ''); a.download = `spt_analysis_state_${dateStr}.json`; a.click(); URL.revokeObjectURL(a.href); alert('保存しました。'); } catch (err) { console.error(err); alert('保存失敗'); } }
+    function loadState(event) { const file = event.target.files[0]; if (!file) return; const reader = new FileReader(); reader.onload = (e) => { try { const state = JSON.parse(e.target.result); hot_data.loadData(state.gridData || []); hot_elev.loadData(state.elevationData || []); if (state.styleGridData) hot_style.loadData(state.styleGridData); soilStyleSettings = state.styleSettings || {}; calculationStandard = state.calculationStandard || 'civil'; document.querySelector(`input[name="standard"][value="${calculationStandard}"]`).checked = true; changeStandard(); architecturalSoilNCap = state.architecturalSoilNCap || 100; document.querySelector(`input[name="arch_n_cap"][value="${architecturalSoilNCap}"]`).checked = true; const loadedInterval = state.penetrationInterval || '10cm'; document.querySelector(`input[name="penetrationInterval"][value="${loadedInterval}"]`).checked = true; changePenetrationInterval(); excludedPoints = new Set(state.excludedPoints || []); hiddenSymbols = new Set(state.hiddenSymbols || []); correctedNValues = state.correctedNValues || {}; if (state.appGlobalSettings) appGlobalSettings = state.appGlobalSettings; layerArticleSettings = state.layerArticleSettings || {}; populateStyleSettingsList(); processData(true); if (state.selectedBoringHoles && state.selectedBoringHoles.length > 0) { const selector = document.getElementById('boringSelector'); Array.from(selector.options).forEach(opt => { opt.selected = state.selectedBoringHoles.includes(opt.value); }); updateSelectedBoringHoles(); } alert('読込完了'); } catch (err) { alert('読込失敗'); console.error(err); } finally { event.target.value = ''; } }; reader.readAsText(file); }
+    function saveSettings() { const blob = new Blob([JSON.stringify(soilStyleSettings, null, 2)], {type: 'application/json'}); const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = 'spt_settings.json'; a.click(); URL.revokeObjectURL(a.href); }
+    function loadSettings(event) { const file = event.target.files[0]; if (!file) return; const reader = new FileReader(); reader.onload = (e) => { try { const loadedSettings = JSON.parse(e.target.result); Object.keys(loadedSettings).forEach(key => { soilStyleSettings[key] = loadedSettings[key]; }); populateStyleSettingsList(); renderAllForSelectedHoles(); } catch (err) { alert('読込失敗'); } }; reader.readAsText(file); event.target.value = ''; }
+    function openHelpModal() { document.getElementById('helpModal').style.display = 'block'; }
+    function closeHelpModal() { document.getElementById('helpModal').style.display = 'none'; }
+    function colorCellRenderer(instance, td, row, col, prop, value, cellProperties) { Handsontable.renderers.TextRenderer.apply(this, arguments); const rowData = instance.getSourceDataAtRow(row); const r = parseInt(rowData.r), g = parseInt(rowData.g), b = parseInt(rowData.b); if (!isNaN(r) && !isNaN(g) && !isNaN(b) && r >= 0 && r <= 255 && g >= 0 && g <= 255 && b >= 0 && b <= 255) { td.style.backgroundColor = `rgb(${r}, ${g}, ${b})`; td.style.color = (r * 0.299 + g * 0.587 + b * 0.114) > 186 ? '#000000' : '#FFFFFF'; } else { td.style.backgroundColor = '#FFFFFF'; td.style.color = '#000000'; } }
+    
+    function initializeGrids() { 
+        const customContextMenu = { items: { "row_above": {}, "row_below": {}, "remove_row": {}, "---": {}, "cut": {}, "copy": {}, "undo": {}, "redo": {} } }; 
+        hot_data = new Handsontable(document.getElementById('dataGrid'), { data: sampleData, ...gridSettings[penetrationInterval], rowHeaders: true, height: 'auto', stretchH: 'all', minSpareRows: 10, contextMenu: customContextMenu }); 
+        hot_elev = new Handsontable(document.getElementById('elevationGrid'), { data: sampleElevations, columns: [ { data: 'boring_hole', type: 'text' }, { data: 'elevation', type: 'numeric', numericFormat: { pattern: '0.00' } } ], colHeaders: ['孔番', '孔口標高 (m)'], rowHeaders: true, height: 'auto', stretchH: 'all', minSpareRows: 5, contextMenu: customContextMenu }); 
+        hot_style = new Handsontable(document.getElementById('styleGrid'), { data: sampleStyles, columns: [ { data: 'seq', type: 'numeric', width: 50 }, { data: 'symbol', type: 'text' }, { data: 'r', type: 'numeric' }, { data: 'g', type: 'numeric' }, { data: 'b', type: 'numeric' }, { data: 'color', readOnly: true, renderer: colorCellRenderer } ], colHeaders: ['連番', '地層記号', 'R', 'G', 'B', '色'], rowHeaders: true, height: 'auto', stretchH: 'all', minSpareRows: 10, contextMenu: customContextMenu, afterChange: (changes, source) => { if (source !== 'loadData') hot_style.render(); } }); 
+    }
+    
+    function applyGridStyles() { 
+        const gridData = hot_style.getSourceData().filter(row => row.symbol); if (gridData.length === 0) { alert('有効なデータがありません。'); return; } 
+        let successCount = 0; const toHex = c => ('0' + parseInt(c, 10).toString(16)).slice(-2).toUpperCase(); 
+        gridData.forEach((row) => { const symbol = String(row.symbol).trim(); if (!symbol) return; const style = getOrCreateSoilStyle(symbol); const r = parseInt(row.r), g = parseInt(row.g), b = parseInt(row.b); if (!isNaN(r) && !isNaN(g) && !isNaN(b) && r >= 0 && r <= 255 && g >= 0 && g <= 255 && b >= 0 && b <= 255) { style.color = `#${toHex(r)}${toHex(g)}${toHex(b)}`; } else { const std = findStandardColor(symbol); if(std) style.color = std; } const seq = parseInt(row.seq); if (!isNaN(seq)) { style.order = seq; } successCount++; }); 
+        alert(`${successCount}件反映しました。`); populateStyleSettingsList(); renderAllForSelectedHoles(); 
+    }
+    
+    function applyStandardColors() {
+        if (!confirm('標準色ルールで上書きしますか？')) return; let appliedCount = 0;
+        Object.keys(soilStyleSettings).forEach(symbol => { const matchedColor = findStandardColor(symbol); if (matchedColor) { soilStyleSettings[symbol].color = matchedColor; appliedCount++; } });
+        populateStyleSettingsList(); renderAllForSelectedHoles(); alert(`完了 (${appliedCount}件)`);
+    }
+
+function exportArticlesToWord() {
+    const container = document.getElementById('articlesContainer');
+    const articles = container.querySelectorAll('.article-box');
+    
+    if (articles.length === 0) {
+        alert('出力する記事がありません。先に記事を生成してください。');
+        return;
+    }
+
+    let contentHTML = `
+        <html xmlns:o='urn:schemas-microsoft-com:office:office' 
+              xmlns:w='urn:schemas-microsoft-com:office:word' 
+              xmlns='http://www.w3.org/TR/REC-html40'>
+        <head>
+            <meta charset='utf-8'>
+            <title>地層記事一覧</title>
+            <style>
+                body { font-family: 'MS Mincho', 'Hiragino Mincho ProN', serif; font-size: 10.5pt; }
+                h1 { font-size: 14pt; font-weight: bold; mso-style-name:"見出し 1"; margin-top: 20px; border-bottom: 1px solid #333; }
+                p { margin-bottom: 5px; line-height: 1.5; }
+                .stats { font-size: 9pt; color: #555; margin-bottom: 10px; }
+            </style>
+        </head>
+        <body>
+    `;
+
+    articles.forEach(box => {
+        const titleElement = box.querySelector('.article-header h3');
+        const title = titleElement ? titleElement.innerText : '名称不明';
+        const statsItems = box.querySelectorAll('.article-stats .article-stat-item');
+        let statsTextParts = [];
+        statsItems.forEach(item => {
+            const label = item.querySelector('strong').innerText;
+            const val = item.querySelector('span').innerText;
+            statsTextParts.push(`${label}: ${val}`);
+        });
+        const statsStr = statsTextParts.join(' | ');
+        const textArea = box.querySelector('textarea');
+        const bodyText = textArea ? textArea.value.replace(/\n/g, '<br>') : '';
+        contentHTML += `
+            <h1>${title}</h1>
+            <p class="stats">【統計情報】 ${statsStr}</p>
+            <p>${bodyText}</p>
+            <br>
+        `;
+    });
+
+    contentHTML += "</body></html>";
+    const blob = new Blob(['\ufeff', contentHTML], { type: 'application/msword' });
+    const dateStr = new Date().toISOString().slice(0, 10).replace(/-/g, '');
+    const filename = `Layer_Articles_${dateStr}.doc`;
+
+    const downloadLink = document.createElement("a");
+    document.body.appendChild(downloadLink);
+    
+    if (navigator.msSaveOrOpenBlob) {
+        navigator.msSaveOrOpenBlob(blob, filename);
+    } else {
+        downloadLink.href = URL.createObjectURL(blob);
+        downloadLink.download = filename;
+        downloadLink.click();
+    }
+    document.body.removeChild(downloadLink);
+}
+
+    window.addEventListener('load', function() {
+        Chart.defaults.font.weight = 'bold'; Chart.defaults.color = '#1f2937'; Chart.defaults.borderColor = '#9ca3af'; Chart.defaults.elements.line.borderWidth = 2.5; Chart.defaults.elements.point.radius = 6; Chart.defaults.scale.title.font = { size: 16, weight: 'bold' };
+        Chart.defaults.font.family = appGlobalSettings.general.fontFamily;
+
+        initializeGrids(); 
+        const menu = document.getElementById('customContextMenu');
+        document.getElementById('contextMenuExclude').addEventListener('click', () => { if(contextTargetItem) { excludedPoints.add(contextTargetItem.id); renderAllForSelectedHoles(); } menu.style.display = 'none'; });
+        document.getElementById('contextMenuInclude').addEventListener('click', () => { if(contextTargetItem) { excludedPoints.delete(contextTargetItem.id); renderAllForSelectedHoles(); } menu.style.display = 'none'; });
+        document.addEventListener('click', (e) => { if (e.target.closest('.modal-content') === null) menu.style.display = 'none'; });
+        window.onclick = function(event) { if (event.target.classList.contains('modal')) event.target.style.display = "none"; }
+        window.addEventListener('keydown', function(e) { if (e.key === 'Escape' && correctionState.isSelecting) { resetCorrection(correctionState.testDataId); alert('キャンセルしました。'); } });
+        
+        processData();
+        showView('dataInputView'); 
+        setTimeout(() => { if (hot_data) hot_data.render(); if (hot_elev) hot_elev.render(); if (hot_style) hot_style.render(); }, 300);
+        document.getElementById('lastUpdated').textContent = `最終更新日: 2025年12月1日`;
+        document.getElementById('legal-toggle').addEventListener('click', () => { const d = document.getElementById('legal-details'); d.style.display = d.style.display === 'none' ? 'block' : 'none'; });
+
+        // ▼▼▼ ここから追加コード ▼▼▼
+        
+        // モーダルをドラッグ可能にする関数
+        function enableModalDrag(modalId) {
+            const modal = document.getElementById(modalId);
+            if (!modal) return;
+            const content = modal.querySelector('.modal-content');
+            const header = content.querySelector('h3'); // タイトル部分を掴めるようにする
+            
+            if (!content || !header) return;
+
+            header.style.cursor = 'move'; // カーソルを移動アイコンに変更
+            header.style.userSelect = 'none'; // タイトル文字を選択できないようにする
+
+            let isDragging = false;
+            let startX, startY, initialLeft, initialTop;
+
+            header.addEventListener('mousedown', (e) => {
+                isDragging = true;
+                startX = e.clientX;
+                startY = e.clientY;
+
+                // 現在の画面上の位置を取得
+                const rect = content.getBoundingClientRect();
+                
+                // CSSのmarginによる中央寄せを解除し、絶対配置に切り替える
+                content.style.margin = '0'; 
+                content.style.position = 'absolute'; 
+                content.style.left = rect.left + 'px';
+                content.style.top = rect.top + 'px';
+                
+                initialLeft = rect.left;
+                initialTop = rect.top;
+            });
+
+            window.addEventListener('mousemove', (e) => {
+                if (!isDragging) return;
+                const dx = e.clientX - startX;
+                const dy = e.clientY - startY;
+                content.style.left = `${initialLeft + dx}px`;
+                content.style.top = `${initialTop + dy}px`;
+            });
+
+            window.addEventListener('mouseup', () => {
+                isDragging = false;
+            });
+        }
+
+        // 各モーダルにドラッグ機能を適用
+        enableModalDrag('settingsModal');             // 全体設定
+        enableModalDrag('quickLegendModal');          // 凡例設定
+        enableModalDrag('layerArticleSettingsModal'); // 記事設定
+        enableModalDrag('helpModal');                 // ヘルプ
+        
+        // ▲▲▲ 追加コードここまで ▲▲▲        
+
+        let resizeTimer;
+        window.addEventListener('resize', () => { clearTimeout(resizeTimer); resizeTimer = setTimeout(() => { const currentDPR = window.devicePixelRatio || 1; Object.values(chartInstances).forEach(chart => { if (chart.canvas && chart.canvas.offsetParent !== null) { chart.options.devicePixelRatio = currentDPR; chart.resize(); } }); }, 100); });
+    });
+</script>
+</body>
+</html>

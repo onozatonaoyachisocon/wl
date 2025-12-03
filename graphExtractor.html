@@ -1,0 +1,435 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>グラフデータ抽出アプリ</title>
+ <link rel="icon" href='data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>📈</text></svg>'>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: #f3f4f6; padding: 24px; }
+        .container { max-width: 1400px; margin: 0 auto; }
+        .card { background: white; border-radius: 8px; box-shadow: 0 1px 3px rgba(0,0,0,0.1); padding: 24px; margin-bottom: 24px; }
+        h1 {
+    font-size: 28px;
+    color: #1f2937;
+    margin-bottom: 8px;
+    background-color: #e0f2fe; /* この行を追加 */
+    padding: 16px;             /* この行を追加（余白） */
+    border-radius: 8px;        /* この行を追加（角を丸くする） */
+}
+        .subtitle { color: #6b7280; margin-bottom: 16px; }
+        .instruction-box { background: #e0f2fe; border-left: 4px solid #0284c7; padding: 16px; margin-bottom: 16px; }
+        .instruction-box p { color: #075985; font-weight: 600; font-size: 15px; }
+        .upload-area { border: 2px dashed #d1d5db; border-radius: 8px; padding: 48px; text-align: center; }
+        .upload-icon { width: 48px; height: 48px; margin: 0 auto 16px; color: #9ca3af; }
+        .btn { padding: 10px 18px; border: none; border-radius: 6px; cursor: pointer; font-size: 14px; font-weight: 600; display: inline-flex; align-items: center; gap: 8px; transition: all 0.2s; }
+        .btn-primary { background: #2563eb; color: white; }
+        .btn-primary:hover { background: #1d4ed8; transform: translateY(-1px); box-shadow: 0 4px 6px rgba(0,0,0,0.1); }
+        .btn-secondary { background: #f3f4f6; color: #374151; border: 1px solid #d1d5db; }
+        .btn-secondary:hover { background: #e5e7eb; border-color: #9ca3af; }
+        .btn-danger { background: #dc2626; color: white; }
+        .btn-danger:hover { background: #b91c1c; transform: translateY(-1px); box-shadow: 0 4px 6px rgba(0,0,0,0.1); }
+        .btn-success { background: #059669; color: white; font-size: 15px; }
+        .btn-success:hover { background: #047857; transform: translateY(-1px); box-shadow: 0 4px 6px rgba(0,0,0,0.1); }
+        .btn:disabled { background: #e5e7eb; color: #9ca3af; cursor: not-allowed; transform: none; box-shadow: none; }
+        .toolbar { display: flex; gap: 16px; margin-bottom: 16px; flex-wrap: wrap; align-items: center; }
+        .input-group { margin-bottom: 16px; }
+        .input-group label { display: block; font-size: 14px; font-weight: 500; margin-bottom: 4px; color: #374151; }
+        .input-group input { width: 100%; padding: 8px 12px; border: 1px solid #d1d5db; border-radius: 6px; font-size: 14px; }
+        .canvas-container { border: 1px solid #d1d5db; border-radius: 8px; background: #f9fafb; padding: 16px; overflow: auto; }
+        canvas { cursor: crosshair; max-width: 100%; height: auto; display: block; margin: 0 auto; }
+        table { width: 100%; border-collapse: collapse; }
+        th, td { border: 1px solid #e5e7eb; padding: 12px 16px; text-align: left; }
+        th { background: #f9fafb; font-weight: 600; color: #374151; }
+        tbody tr:hover { background: #f9fafb; }
+        .table-container { max-height: 400px; overflow: auto; }
+        .header-flex { display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; }
+        .hidden { display: none; }
+        .settings-grid { display: flex; gap: 12px; margin-bottom: 16px; padding: 16px; background: #fff3cd; border: 2px solid #ffc107; border-radius: 8px; justify-content: center;}
+        .settings-group { background: white; padding: 12px 20px; border-radius: 8px; border: 2px solid #e5e7eb; }
+        .settings-group:hover { border-color: #3b82f6; }
+        .settings-group label { display: flex; align-items: center; gap: 10px; cursor: pointer; font-weight: 500; color: #1f2937; }
+        .settings-group input[type="checkbox"] { width: 20px; height: 20px; cursor: pointer; }
+        select { padding: 8px 12px; border: 2px solid #3b82f6; border-radius: 6px; font-size: 14px; font-weight: 600; color: #1f2937; background: white; cursor: pointer; }
+        select:hover { border-color: #2563eb; background: #eff6ff; }
+        /* ----- ここから追加・修正したスタイル ----- */
+        .axis-setting-container {
+            background: #f8f9fa;
+            border: 1px solid #dee2e6;
+            border-radius: 8px;
+            padding: 16px;
+            text-align: center;
+        }
+        .axis-title {
+            font-weight: 600;
+            color: #495057;
+            margin-bottom: 12px;
+            font-size: 16px;
+        }
+        /* ----- ここまで追加・修正したスタイル ----- */
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="card">
+            <h1>📈グラフデータ抽出アプリ</h1>
+            <p class="subtitle">片対数・両対数・リニアグラフから複数曲線のデータを半自動で抽出します</p>
+
+            <div class="instruction-box">
+                <p id="instruction">ステップ 0: 画像をアップロードしてください</p>
+            </div>
+
+            <div id="uploadArea" class="upload-area">
+                <svg class="upload-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"/></svg>
+                <label class="btn btn-primary">画像を選択<input type="file" accept="image/*" id="imageInput" class="hidden"></label>
+            </div>
+
+            <div id="mainArea" class="hidden">
+                <div class="toolbar">
+                    <button id="zoomInBtn" class="btn btn-secondary"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0zM10 7v6m3-3H7"/></svg>拡大</button>
+                    <button id="zoomOutBtn" class="btn btn-secondary"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0zM13 10H7"/></svg>縮小</button>
+                    <button id="resetBtn" class="btn btn-danger"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg>リセット</button>
+                </div>
+
+                <!-- ===== ここからHTML構造を修正 ===== -->
+                <div id="settingsArea" class="settings-grid hidden">
+                    <div class="axis-setting-container">
+                        <p class="axis-title">↔ X軸の設定</p>
+                        <div class="settings-group">
+                            <label><input type="checkbox" id="xLogCheckbox" checked> 対数スケールにする</label>
+                        </div>
+                    </div>
+                    <div class="axis-setting-container">
+                        <p class="axis-title">↕ Y軸の設定</p>
+                        <div class="settings-group">
+                            <label><input type="checkbox" id="yLogCheckbox"> 対数スケールにする</label>
+                        </div>
+                    </div>
+                </div>
+                <!-- ===== ここまでHTML構造を修正 ===== -->
+
+                <div id="axisInputArea" class="hidden">
+                    <div class="input-group">
+                        <label id="axisLabel">値を入力してください</label>
+                        <input type="number" step="any" id="axisInput">
+                    </div>
+                </div>
+
+                <div id="extractArea" class="hidden">
+                    <div class="toolbar">
+                        <select id="curveSelector"></select>
+                        <button id="addCurveBtn" class="btn btn-secondary">新しい曲線を追加</button>
+                        <button id="extractBtn" class="btn btn-success" disabled>データ抽出 (0点)</button>
+                        <button id="clearPointsBtn" class="btn btn-secondary hidden">現在の曲線をクリア</button>
+                    </div>
+                </div>
+
+                <div class="canvas-container"><canvas id="canvas"></canvas></div>
+            </div>
+        </div>
+
+        <div id="dataArea" class="card hidden">
+            <div class="header-flex">
+                <h2>抽出データ</h2>
+                <button id="exportBtn" class="btn btn-primary"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/></svg>CSVダウンロード</button>
+            </div>
+            <div class="table-container">
+                <table>
+                    <thead><tr><th>曲線</th><th>X値</th><th>Y値</th></tr></thead>
+                    <tbody id="dataTable"></tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+<script>
+    var state = {
+        step: 0, image: null, calibrationPoints: [],
+        curves: [], activeCurveIndex: -1,
+        scale: 1, offset: { x: 0, y: 0 },
+        axisConfig: {
+            xMin: 0.01, xMax: 10, yMin: 0, yMax: 100,
+            xLog: true, yLog: false
+        },
+        extractedData: []
+    };
+    var curveColors = ['#007bff', '#28a745', '#dc3545', '#ffc107', '#17a2b8', '#6610f2'];
+
+    var instructions = [
+        "画像をアップロードしてください", "X軸の最小値の位置をクリック", "X軸の最大値の位置をクリック",
+        "Y軸の最小値の位置をクリック", "Y軸の最大値の位置をクリック", "曲線上の点をクリックしてデータを抽出"
+    ];
+    var axisLabels = ["", "X軸最小値", "X軸最大値", "Y軸最小値", "Y軸最大値"];
+
+    var canvas = document.getElementById('canvas');
+    var ctx = canvas.getContext('2d');
+
+    document.getElementById('imageInput').addEventListener('change', handleImageUpload);
+    document.getElementById('zoomInBtn').addEventListener('click', () => zoom(1.2));
+    document.getElementById('zoomOutBtn').addEventListener('click', () => zoom(1 / 1.2));
+    document.getElementById('resetBtn').addEventListener('click', reset);
+    document.getElementById('extractBtn').addEventListener('click', extractData);
+    document.getElementById('clearPointsBtn').addEventListener('click', clearCurrentCurvePoints);
+    document.getElementById('exportBtn').addEventListener('click', exportCSV);
+    document.getElementById('addCurveBtn').addEventListener('click', addNewCurve);
+    document.getElementById('curveSelector').addEventListener('change', (e) => {
+        state.activeCurveIndex = parseInt(e.target.value);
+        updateExtractButton();
+        drawCanvas();
+    });
+    canvas.addEventListener('click', handleCanvasClick);
+    document.getElementById('axisInput').addEventListener('input', handleAxisInput);
+    document.getElementById('xLogCheckbox').addEventListener('change', (e) => state.axisConfig.xLog = e.target.checked);
+    document.getElementById('yLogCheckbox').addEventListener('change', (e) => state.axisConfig.yLog = e.target.checked);
+
+    function handleImageUpload(e) {
+        var file = e.target.files[0]; if (!file) return;
+        var reader = new FileReader();
+        reader.onload = function(event) {
+            var img = new Image();
+            img.onload = function() {
+                resetState(true);
+                state.image = img;
+                document.getElementById('uploadArea').classList.add('hidden');
+                document.getElementById('mainArea').classList.remove('hidden');
+                document.getElementById('settingsArea').classList.remove('hidden');
+                document.getElementById('axisInputArea').classList.remove('hidden');
+                addNewCurve();
+                updateInstruction();
+                drawCanvas();
+            };
+            img.src = event.target.result;
+        };
+        reader.readAsDataURL(file);
+    }
+
+    function resetState(isNewImage = false) {
+        if (!isNewImage) {
+            state.image = null;
+        }
+        state.step = 1;
+        state.calibrationPoints = [];
+        state.curves = [];
+        state.activeCurveIndex = -1;
+        state.extractedData = [];
+        state.scale = 1;
+        state.offset = { x: 0, y: 0 };
+    }
+
+    function handleCanvasClick(e) {
+        var rect = canvas.getBoundingClientRect();
+        var scaleX = canvas.width / rect.width;
+        var scaleY = canvas.height / rect.height;
+        var canvasX = (e.clientX - rect.left) * scaleX;
+        var canvasY = (e.clientY - rect.top) * scaleY;
+
+        var x = (canvasX / state.scale) - state.offset.x;
+        var y = (canvasY / state.scale) - state.offset.y;
+
+        if (state.step >= 1 && state.step <= 4) {
+            state.calibrationPoints.push({ x: x, y: y });
+            state.step++;
+            if (state.step === 5) {
+                document.getElementById('axisInputArea').classList.add('hidden');
+                document.getElementById('extractArea').classList.remove('hidden');
+            }
+            updateInstruction();
+        } else if (state.step === 5 && state.activeCurveIndex !== -1) {
+            state.curves[state.activeCurveIndex].points.push({ x: x, y: y });
+            updateExtractButton();
+        }
+        drawCanvas();
+    }
+
+    function handleAxisInput(e) {
+        var val = parseFloat(e.target.value); if (isNaN(val)) return;
+        var step = state.step;
+        if (step === 1) state.axisConfig.xMin = val;
+        else if (step === 2) state.axisConfig.xMax = val;
+        else if (step === 3) state.axisConfig.yMin = val;
+        else if (step === 4) state.axisConfig.yMax = val;
+    }
+
+    function updateInstruction() {
+        document.getElementById('instruction').textContent = `ステップ ${state.step}: ${instructions[state.step]}`;
+        var axisInput = document.getElementById('axisInput');
+        var axisLabel = document.getElementById('axisLabel');
+        if (state.step >= 1 && state.step <= 4) {
+            axisLabel.textContent = axisLabels[state.step];
+            if (state.step === 1) axisInput.value = state.axisConfig.xMin;
+            else if (state.step === 2) axisInput.value = state.axisConfig.xMax;
+            else if (state.step === 3) axisInput.value = state.axisConfig.yMin;
+            else if (state.step === 4) axisInput.value = state.axisConfig.yMax;
+        }
+    }
+
+    function drawCanvas() {
+        if (!state.image) return;
+        canvas.width = state.image.width; canvas.height = state.image.height;
+        ctx.save();
+        ctx.scale(state.scale, state.scale);
+        ctx.translate(state.offset.x, state.offset.y);
+        ctx.drawImage(state.image, 0, 0);
+
+        ctx.fillStyle = 'red'; ctx.strokeStyle = 'white'; ctx.lineWidth = 2 / state.scale;
+        state.calibrationPoints.forEach((p, i) => {
+            ctx.beginPath(); ctx.arc(p.x, p.y, 8 / state.scale, 0, 2 * Math.PI); ctx.fill(); ctx.stroke();
+            ctx.fillStyle = 'white'; ctx.font = `bold ${16 / state.scale}px sans-serif`;
+            ctx.fillText(i + 1, p.x - (4 / state.scale), p.y + (5 / state.scale));
+            ctx.fillStyle = 'red';
+        });
+
+        state.curves.forEach((curve, index) => {
+            ctx.strokeStyle = curve.color; ctx.fillStyle = curve.color;
+            ctx.lineWidth = (index === state.activeCurveIndex) ? 4 / state.scale : 2 / state.scale;
+
+            curve.points.forEach(p => {
+                ctx.beginPath(); ctx.arc(p.x, p.y, 5 / state.scale, 0, 2 * Math.PI); ctx.fill();
+            });
+
+            if (curve.points.length > 1) {
+                var sorted = [...curve.points].sort((a, b) => a.x - b.x);
+                ctx.beginPath();
+                ctx.moveTo(sorted[0].x, sorted[0].y);
+                sorted.slice(1).forEach(p => ctx.lineTo(p.x, p.y));
+                ctx.stroke();
+            }
+        });
+        ctx.restore();
+    }
+
+    function zoom(factor) {
+        state.scale *= factor;
+        drawCanvas();
+    }
+
+    function reset() {
+        if (!state.image) return;
+        resetState(true);
+        document.getElementById('axisInputArea').classList.remove('hidden');
+        document.getElementById('extractArea').classList.add('hidden');
+        document.getElementById('dataArea').classList.add('hidden');
+        document.getElementById('settingsArea').classList.remove('hidden');
+        addNewCurve();
+        updateInstruction();
+        updateExtractButton();
+        drawCanvas();
+    }
+
+    function clearCurrentCurvePoints() {
+        if (state.activeCurveIndex > -1) {
+            state.curves[state.activeCurveIndex].points = [];
+            state.extractedData = state.extractedData.filter(d => d.curveName !== state.curves[state.activeCurveIndex].name);
+            if(state.extractedData.length === 0) document.getElementById('dataArea').classList.add('hidden');
+            else displayData();
+            updateExtractButton();
+            drawCanvas();
+        }
+    }
+
+    function addNewCurve() {
+        const newCurveName = `曲線 ${state.curves.length + 1}`;
+        state.curves.push({
+            name: newCurveName,
+            points: [],
+            color: curveColors[state.curves.length % curveColors.length]
+        });
+        state.activeCurveIndex = state.curves.length - 1;
+        updateCurveSelector();
+        updateExtractButton();
+    }
+
+    function updateCurveSelector() {
+        const selector = document.getElementById('curveSelector');
+        selector.innerHTML = state.curves.map((curve, index) =>
+            `<option value="${index}" ${index === state.activeCurveIndex ? 'selected' : ''}>${curve.name}</option>`
+        ).join('');
+    }
+
+    function updateExtractButton() {
+        var btn = document.getElementById('extractBtn');
+        var clearBtn = document.getElementById('clearPointsBtn');
+        if (state.activeCurveIndex > -1) {
+            const numPoints = state.curves[state.activeCurveIndex].points.length;
+            btn.textContent = `データ抽出 (${numPoints}点)`;
+            btn.disabled = numPoints === 0;
+            clearBtn.classList.toggle('hidden', numPoints === 0);
+        } else {
+            btn.textContent = `データ抽出 (0点)`;
+            btn.disabled = true;
+            clearBtn.classList.add('hidden');
+        }
+    }
+
+    function pixelToValue(px, py) {
+        if (state.calibrationPoints.length < 4) return null;
+        var [xMinP, xMaxP, yMinP, yMaxP] = state.calibrationPoints;
+
+        var xRatio = (px - xMinP.x) / (xMaxP.x - xMinP.x);
+        var xValue;
+        if (state.axisConfig.xLog) {
+            if (state.axisConfig.xMin <= 0 || state.axisConfig.xMax <= 0) return {x: NaN, y: NaN};
+            var logMin = Math.log10(state.axisConfig.xMin);
+            var logMax = Math.log10(state.axisConfig.xMax);
+            xValue = Math.pow(10, logMin + xRatio * (logMax - logMin));
+        } else {
+            xValue = state.axisConfig.xMin + xRatio * (state.axisConfig.xMax - state.axisConfig.xMin);
+        }
+
+        var yRatio = (py - yMinP.y) / (yMaxP.y - yMinP.y);
+        var yValue;
+        if (state.axisConfig.yLog) {
+            if (state.axisConfig.yMin <= 0 || state.axisConfig.yMax <= 0) return {x: NaN, y: NaN};
+            var logMin = Math.log10(state.axisConfig.yMin);
+            var logMax = Math.log10(state.axisConfig.yMax);
+            yValue = Math.pow(10, logMin + yRatio * (logMax - logMin));
+        } else {
+            yValue = state.axisConfig.yMin + yRatio * (state.axisConfig.yMax - state.axisConfig.yMin);
+        }
+        return { x: xValue, y: yValue };
+    }
+
+    function extractData() {
+        state.extractedData = [];
+        state.curves.forEach(curve => {
+            var curveData = curve.points.map(point => {
+                var values = pixelToValue(point.x, point.y);
+                if (!values || isNaN(values.x)) return null;
+                return {
+                    curveName: curve.name,
+                    xValue: values.x.toFixed(4),
+                    yValue: values.y.toFixed(2)
+                };
+            }).filter(Boolean).sort((a, b) => parseFloat(a.xValue) - parseFloat(b.xValue));
+            state.extractedData.push(...curveData);
+        });
+        displayData();
+    }
+
+    function displayData() {
+        var tbody = document.getElementById('dataTable');
+        tbody.innerHTML = state.extractedData.map(row => `
+            <tr>
+                <td>${row.curveName}</td>
+                <td style="text-align: right">${row.xValue}</td>
+                <td style="text-align: right">${row.yValue}</td>
+            </tr>
+        `).join('');
+        document.getElementById('dataArea').classList.remove('hidden');
+    }
+
+    function exportCSV() {
+        if (state.extractedData.length === 0) return;
+        var csv = '曲線,X値,Y値\n' +
+            state.extractedData.map(d => `${d.curveName},${d.xValue},${d.yValue}`).join('\n');
+
+        var blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+        var link = document.createElement('a');
+        link.href = URL.createObjectURL(blob);
+        link.download = 'graph_data.csv';
+        link.click();
+    }
+</script>
+</body>
+</html>

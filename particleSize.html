@@ -1,0 +1,1642 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>粒度試験結果・整理システム</title>
+   <link rel="icon" href='data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>📊</text></svg>'>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/3.9.1/chart.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels@2.0.0"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/pptxgenjs@3.12.0/dist/pptxgen.min.js"></script>
+    
+    <!-- Handsontable v6.2.2 -->
+    <script src="https://cdn.jsdelivr.net/npm/handsontable@6.2.2/dist/handsontable.full.min.js"></script>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/handsontable@6.2.2/dist/handsontable.full.min.css" />
+
+    <style>
+/* --- 全体レイアウト --- */
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body { font-family: "Helvetica Neue", Arial, sans-serif; height: 100vh; display: flex; overflow: hidden; background: #f4f6f7; color: #333; }
+
+/* --- サイドバー --- */
+.sidebar { width: 320px; background-color: #1e2634; color: #ecf0f1; padding: 15px; display: flex; flex-direction: column; gap: 15px; overflow-y: auto; border-right: 1px solid #000; flex-shrink: 0; z-index: 10; }
+.sidebar-title { display: flex; align-items: center; justify-content: center; margin-bottom: 10px; color: #fff; font-size: 16px; font-weight: bold; text-align: center; line-height: 1.4; }
+.sidebar-panel { background: #2c3e50; padding: 10px; border-radius: 6px; border: 1px solid #455a64; margin-bottom: 0; transition: all 0.2s; }
+.sidebar h3 { margin: 0 0 10px 0; font-size: 13px; color: #bdc3c7; border-bottom: 1px solid #555; padding-bottom: 5px; }
+
+/* サイドバー部品 */
+.collapsible-header { cursor: pointer; display: flex; justify-content: space-between; align-items: center; user-select: none; }
+.collapsible-header:hover { color: #fff; }
+.arrow-icon { font-size: 10px; transition: transform 0.2s; }
+.control-item { margin-bottom: 12px; }
+.control-label { display: block; font-size: 12px; color: #ccc; margin-bottom: 4px; }
+select.dark-input, input[type="number"].dark-input { width: 100%; padding: 6px; border-radius: 4px; border: 1px solid #555; background: #34495e; color: #fff; font-size: 13px; }
+label.toggle { display: flex; align-items: center; cursor: pointer; font-size: 12px; user-select: none; color: #ecf0f1; padding: 4px 0; }
+label.toggle input { margin-right: 8px; }
+
+.btn-group { display: flex; gap: 5px; margin-bottom: 5px; }
+.btn-sidebar { flex: 1; padding: 8px; border: none; border-radius: 4px; color: white; cursor: pointer; font-size: 12px; font-weight: bold; text-align: center; display: inline-flex; align-items: center; justify-content: center; transition: opacity 0.2s; }
+.btn-sidebar:hover { opacity: 0.9; }
+.btn-blue { background-color: #2980b9; }
+.btn-green { background-color: #27ae60; }
+.btn-orange { background-color: #d35400; }
+.btn-gray { background-color: #7f8c8d; }
+.btn-purple { background-color: #8e44ad; }
+.help-icon { background: #6c757d; color: white; border: none; border-radius: 50%; width: 20px; height: 20px; font-size: 12px; font-weight: bold; cursor: pointer; margin-left: 10px; display: flex; align-items: center; justify-content: center; box-shadow: 0 2px 4px rgba(0,0,0,0.3); }
+
+/* --- メインコンテンツ --- */
+#main-content { flex-grow: 1; display: flex; flex-direction: column; overflow-y: auto; padding: 20px; background: #f4f6f7; position: relative; }
+
+/* --- 各種パーツ --- */
+.charts-wrapper, .composition-wrapper { display: flex; flex-direction: column; gap: 24px; }
+.chart-box { background: white; border-radius: 8px; padding: 16px; border: 1px solid #e5e7eb; position: relative; }
+.chart-actions { position: absolute; top: 10px; right: 10px; z-index: 10; }
+.table-container { overflow-x: auto; }
+table { width: 100%; border-collapse: collapse; font-size: 13px; }
+th { background: #3b82f6; color: white; padding: 10px 8px; text-align: left; font-weight: 600; border: 1px solid #2563eb; white-space: nowrap; }
+td { padding: 0; border: 1px solid #d1d5db; vertical-align: middle; }
+input[type="text"], input[type="number"] { width: 100%; border: none; padding: 8px; font-size: 13px; outline: none; background: transparent; }
+input[type="color"] { width: 100%; height: 38px; border: none; padding: 4px; background: transparent; }
+textarea.data-editor { width: 100%; height: 100px; border: none; padding: 8px; font-family: monospace; font-size: 12px; resize: vertical; outline: none; white-space: pre; overflow-y: auto; }
+button, .btn-file { padding: 8px 16px; border-radius: 6px; border: none; cursor: pointer; font-weight: 500; transition: 0.2s; display: inline-flex; justify-content: center; align-items: center; text-align: center; white-space: nowrap; }
+.btn-add { background: #3b82f6; color: white; }
+.btn-del { background: #ef4444; color: white; }
+.btn-export { background: #10b981; color: white; }
+.btn-import { background: #f59e0b; color: white; }
+.btn-download { font-size: 12px; padding: 4px 8px; background: #6b7280; color: white; }
+.help-text { font-size: 12px; color: #6b7280; margin: 4px 0 12px 0; }
+.file-input { display: none; }
+
+/* タブ */
+.tabs { border-bottom: 2px solid #2c3e50; margin-bottom: 10px; display: flex; gap: 4px; }
+.tab-link { background: #bdc3c7; padding: 8px 20px; cursor: pointer; font-size: 13px; font-weight: bold; color: #2c3e50; border: 1px solid #95a5a6; border-bottom: none; border-radius: 4px 4px 0 0; min-width: 100px; text-align: center; margin-bottom: 0; }
+.tab-link.active { background: #2c3e50; color: #fff; border-color: #2c3e50; }
+.tab-content { display: none; height: 100%; }
+
+/* モーダル共通 */
+.modal-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0, 0, 0, 0.6); z-index: 1000; display: none; align-items: center; justify-content: center; }
+.modal-content { background: white; border-radius: 8px; width: 95%; max-width: 1200px; height: 90vh; display: flex; flex-direction: column; overflow: hidden; box-shadow: 0 10px 25px rgba(0,0,0,0.3); }
+.modal-header { padding: 16px; border-bottom: 1px solid #e5e7eb; display: flex; justify-content: space-between; align-items: center; background: #f8f9fa; }
+.modal-header h3 { font-size: 18px; margin: 0; }
+.modal-header .close-btn { font-size: 24px; cursor: pointer; border: none; background: none; }
+.modal-body { flex-grow: 1; padding: 16px; overflow-y: auto; }
+.modal-footer { padding: 16px; border-top: 1px solid #e5e7eb; text-align: right; flex-shrink: 0; background: #f8f9fa; display: flex; justify-content: flex-end; gap: 10px; }
+
+/* 各種モーダル内調整 */
+.modal-body-split { display: grid; grid-template-columns: 320px 1fr; gap: 16px; height: 100%; overflow: hidden; }
+.modal-body-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; height: 100%; overflow: hidden; }
+.processor-col { display: flex; flex-direction: column; overflow: hidden; height: 100%; }
+.handsontable-container { flex-grow: 1; overflow: hidden; border: 1px solid #ccc; }
+.canvas-panel { border: 1px solid #d1d5db; border-radius: 8px; background: #f9fafb; padding: 16px; overflow: auto; display: flex; align-items: center; justify-content: center; height: 100%; }
+.controls-panel { display: flex; flex-direction: column; gap: 12px; overflow-y: auto; }
+
+/* 抽出ツール用 */
+.instruction-box { background: #eff6ff; border-left: 4px solid #3b82f6; padding: 12px; border-radius: 4px; }
+.input-group { margin-bottom: 8px; }
+.input-group label { display: block; font-size: 13px; font-weight: 500; margin-bottom: 4px; }
+.input-group input { width: 100%; padding: 6px 10px; border: 1px solid #d1d5db; border-radius: 4px; font-size: 13px; }
+.curve-btn { flex-grow: 1; background: #e5e7eb; color: #374151; }
+.curve-btn.active { background: #3b82f6; color: white; font-weight: bold; }
+.final-actions { border-top: 1px solid #e5e7eb; padding-top: 12px; display: flex; flex-direction: column; gap: 8px; }
+.hidden { display: none; }
+
+/* 基準範囲テーブル */
+.accordion-group { border: 1px solid #d1d5db; border-radius: 8px; margin-bottom: 12px; overflow: hidden; background-color: white; }
+.accordion-header { background-color: #f9fafb; padding: 10px 15px; cursor: pointer; display: flex; align-items: center; gap: 10px; }
+.accordion-header:hover { background-color: #f3f4f6; }
+.accordion-header .toggle-icon { font-size: 12px; width: 16px; text-align: center; }
+.accordion-header .group-name-input { flex-grow: 1; font-size: 16px; font-weight: bold; border: none; background: transparent; padding: 4px; }
+.accordion-header .header-actions { margin-left: auto; }
+.accordion-header .header-actions button { font-size: 12px; padding: 4px 8px; min-height: 0; }
+.accordion-content { padding: 15px; border-top: 1px solid #d1d5db; display: none; }
+.accordion-content.open { display: block; }
+
+/* 既存テーブル調整 */
+td.cell-center { text-align: center; }
+#dataTable td { padding: 0; }
+#dataTable input, #dataTable textarea { padding-top: 2px; padding-bottom: 2px; font-size: 12px; }
+#dataTable textarea.data-editor { height: 30px; }
+#dataTable .btn-del { min-height: 0; height: 100%; padding: 4px; }
+
+/* ヘルプモーダル */
+#helpModal .modal-content, #layerOrderModal .modal-content { max-width: 800px; height: auto; max-height: 85vh; }
+#helpModal .modal-body { display: block; padding: 25px; line-height: 1.7; overflow-y: auto;}
+#helpModal h4 { font-size: 1.1em; margin-top: 20px; margin-bottom: 8px; padding-bottom: 5px; border-bottom: 2px solid #3b82f6; }
+#helpModal ul { margin-left: 20px; margin-bottom: 10px; }
+#layerOrderList { list-style-type: none; padding: 0; }
+#layerOrderList li { padding: 12px; margin-bottom: 8px; background-color: #f9fafb; border: 1px solid #d1d5db; border-radius: 6px; cursor: grab; display: flex; align-items: center; gap: 10px; font-weight: 500; }
+#layerOrderList li.dragging { opacity: 0.5; background: #e0f2fe; }
+
+#locationFilterContainer { display: flex; flex-wrap: wrap; align-items: center; gap: 15px; padding: 10px; background-color: #f9fafb; border-radius: 6px; margin-bottom: 16px; border: 1px solid #e5e7eb; }
+    </style>
+</head>
+<body>
+    <!-- 左サイドバー -->
+    <div id="sidebar" class="sidebar">
+        <div class="sidebar-title">
+            <span>📊 粒度試験結果整理システム</span>
+            <button id="helpButton" class="help-icon" title="ヘルプ">?</button>
+        </div>
+
+        <div class="sidebar-panel">
+            <h3>データ操作</h3>
+            <div class="btn-group">
+                <button class="btn-sidebar btn-green" onclick="saveAppState()">💾 保存</button>
+                <label for="appStateFileInput" class="btn-sidebar btn-orange" style="margin-bottom:0; cursor:pointer;">📂 読込</label>
+                <input type="file" id="appStateFileInput" class="file-input" accept=".json" onchange="handleAppStateImport(event)" style="display: none;">
+            </div>
+            <!-- Step 4: データ編集ボタンを追加 -->
+            <button class="btn-sidebar btn-blue" style="width:100%; margin-top:5px;" onclick="openInputModal()">✏️ データ編集</button>
+        </div>
+
+        <!-- グラフ設定パネル (アコーディオン) -->
+        <div class="sidebar-panel">
+            <h3 class="collapsible-header" onclick="toggleSidebarPanel('panel-display-settings', 'arrow-display')">
+                グラフ表示設定
+                <span id="arrow-display" class="arrow-icon">▼</span>
+            </h3>
+            <div id="panel-display-settings">
+                <label class="toggle"><input type="checkbox" id="gridToggle" checked onchange="updateAllChartOptions()"> グリッド表示</label>
+                <label class="toggle"><input type="checkbox" id="soilBgToggle" checked onchange="updateAllChartOptions()"> 土質背景着色</label>
+                <label class="toggle"><input type="checkbox" id="markerToggle" checked onchange="renderGradationCharts()"> マーカー表示</label>
+                <label class="toggle"><input type="checkbox" id="dataLabelsToggle" onchange="updateAllChartOptions()"> データラベル</label>
+                <div class="control-item">
+                    <span class="control-label">グラフの高さ (px)</span>
+                    <input type="number" id="chartHeightInput" value="500" step="50" class="dark-input" onchange="updateAllChartOptions()">
+                </div>
+            </div>
+        </div>
+
+        <div class="sidebar-panel">
+            <h3 class="collapsible-header" onclick="toggleSidebarPanel('panel-group-settings', 'arrow-group')">
+                基準・グループ
+                <span id="arrow-group" class="arrow-icon">▶</span>
+            </h3>
+            <div id="panel-group-settings" style="display:none;">
+                <div class="control-item">
+                    <span class="control-label">グラフ化の単位</span>
+                    <select id="groupingCriteria" class="dark-input" onchange="renderGradationCharts()">
+                        <option value="layer" selected>土層</option>
+                        <option value="location">地点名</option>
+                        <option value="soilType">土質名</option>
+                        <option value="all">すべて統合</option>
+                        <option value="each">試料ごと</option>
+                    </select>
+                </div>
+                <div class="control-item">
+                    <span class="control-label">基準範囲の表示</span>
+                    <select id="standardGroupSelector" class="dark-input" onchange="renderGradationCharts()"></select>
+                </div>
+                <button class="btn-sidebar btn-gray" style="width:100%;" onclick="openLayerOrderModal()">土層番号の自動割当</button>
+            </div>
+        </div>
+
+        <div class="sidebar-panel">
+            <h3 class="collapsible-header" onclick="toggleSidebarPanel('panel-legend-settings', 'arrow-legend')">
+                凡例の設定
+                <span id="arrow-legend" class="arrow-icon">▶</span>
+            </h3>
+            <div id="panel-legend-settings" style="display:none;">
+                <div style="margin-bottom:8px;">
+                    <span class="control-label">表示項目:</span>
+                    <label class="toggle"><input type="checkbox" class="legend-option" value="location" checked onchange="renderGradationCharts()"> 地点名</label>
+                    <label class="toggle"><input type="checkbox" class="legend-option" value="name" checked onchange="renderGradationCharts()"> 試料名</label>
+                    <label class="toggle"><input type="checkbox" class="legend-option" value="depth" checked onchange="renderGradationCharts()"> 深度</label>
+                    <label class="toggle"><input type="checkbox" class="legend-option" value="soilType" onchange="renderGradationCharts()"> 土質名</label>
+                </div>
+                <label class="toggle" style="border-top:1px solid #555; padding-top:5px;"><input type="checkbox" id="legendStyleToggle" onchange="updateAllChartOptions()"> 凡例を右側に表示</label>
+                <div style="display:flex; gap:10px; margin-top:5px;">
+                    <div style="flex:1;">
+                        <span class="control-label">文字サイズ</span>
+                        <input type="number" id="legendFontSize" value="12" min="8" max="24" class="dark-input" onchange="updateAllChartOptions()">
+                    </div>
+                    <div style="flex:1;">
+                        <span class="control-label">マーカー</span>
+                        <input type="number" id="legendMarkerSize" value="12" min="8" max="30" class="dark-input" onchange="updateAllChartOptions()">
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="sidebar-panel">
+            <h3 class="collapsible-header" onclick="toggleSidebarPanel('panel-export', 'arrow-export')">
+                画像・出力
+                <span id="arrow-export" class="arrow-icon">▶</span>
+            </h3>
+            <div id="panel-export" style="display:none;">
+                <div class="control-item">
+                    <span class="control-label">画像解像度</span>
+                    <select id="pngResolution" class="dark-input">
+                        <option value="1">標準 (1x)</option>
+                        <option value="2" selected>高解像度 (2x)</option>
+                        <option value="3">最高解像度 (3x)</option>
+                    </select>
+                </div>
+                <div class="control-item">
+                    <span class="control-label">画像形式</span>
+                    <select id="imageFormat" class="dark-input">
+                        <option value="png" selected>PNG</option>
+                        <option value="jpeg">JPG</option>
+                    </select>
+                </div>
+                <div class="btn-group">
+                    <button class="btn-sidebar btn-purple" onclick="exportToPowerPoint()">PPTX出力</button>
+                    <button class="btn-sidebar btn-green" onclick="downloadAllChartsAsZip()">ZIP保存</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- メインコンテンツ -->
+    <div id="main-content">
+        <div class="tabs">
+            <button class="tab-link active" onclick="openTab(event, 'GradationCurve')">📈粒径加積曲線</button>
+            <button class="tab-link" onclick="openTab(event, 'ReferenceStandards')">🎛️基準範囲の設定</button>
+            <button class="tab-link" onclick="openTab(event, 'Composition')">🧮粒度構成</button>
+        </div>
+
+        <div id="GradationCurve" class="tab-content" style="display:block;">
+            <div id="locationFilterContainer"></div>
+            <div class="charts-wrapper" id="chartsContainer"></div>
+        </div>
+
+        <div id="ReferenceStandards" class="tab-content">
+            <h2 style="margin-top:10px;">背景に表示する基準範囲の設定</h2>
+            <div id="standardsContainer"></div>
+            <div style="margin-top: 12px; display: flex; gap: 10px; flex-wrap: wrap;">
+                <button class="btn-add" onclick="addNewGroup()">＋ 新規グループを追加</button>
+                <button class="btn-export" onclick="exportStandards()">設定を保存 (.json)</button>
+                <label for="standardsFileInput" class="btn-file btn-import">設定を読込 (.json)</label>
+                <input type="file" id="standardsFileInput" class="file-input" accept=".json" onchange="handleStandardsImport(event)">
+            </div>
+        </div>
+
+        <div id="Composition" class="tab-content">
+            <div class="controls" style="flex-direction: column; align-items: flex-start; gap: 12px; margin-top:10px;">
+                <div style="display: flex; gap: 15px; align-items: center; flex-wrap: wrap;">
+                    <label for="compositionDisplayMode">表示方法:</label>
+                    <select id="compositionDisplayMode" onchange="renderCompositionChart()">
+                        <option value="grouped">土層ごとに表示</option>
+                        <option value="all">全体を統合して表示</option>
+                    </select>
+                    <label for="sortOrder" style="margin-left: 10px;">並べ替え:</label>
+                    <select id="sortOrder" onchange="renderCompositionChart()">
+                        <option value="default">入力順</option>
+                        <option value="depth">深度順 (浅い順)</option>
+                        <option value="layer">土層順</option>
+                        <option value="location">地点ごと</option>
+                    </select>
+                    <label for="interpolationMethod" style="margin-left: 10px;">補間方法:</label>
+                    <select id="interpolationMethod" onchange="renderCompositionChart()">
+                        <option value="logarithmic" selected>曲線補間(対数)</option>
+                        <option value="linear">直線補間</option>
+                    </select>
+                </div>
+                <div style="display: flex; gap: 10px; align-items: center; flex-wrap: wrap; padding-top: 10px; border-top: 1px solid #e5e7eb; width: 100%;">
+                    <span style="font-weight: 500;">エクスポート:</span>
+                    <button class="btn-export" style="background-color: #6d28d9;" onclick="exportCompositionToPowerPoint()">📤 PPTX出力</button>
+                    <button class="btn-export" style="background-color: #059669;" onclick="downloadAllCompositionChartsAsZip()">🏞️ ZIP一括保存</button>
+                    <p class="help-text" style="margin: 0 0 0 10px;">※現在表示されているグラフがすべて出力されます。</p>
+                </div>
+            </div>
+            <div class="composition-wrapper" id="compositionContainer"></div>
+        </div>
+
+        <!-- フッター -->
+        <footer style="font-size: 12px; text-align: center; padding: 20px; color: #6c757d; background-color: #f8f9fa; border-top: 1px solid #e9ecef; margin-top: auto;">
+            <div style="display: flex; justify-content: center; align-items: center; gap: 20px; flex-wrap: wrap; margin-bottom: 10px;">
+                <p id="lastUpdated" style="margin: 0; font-weight: 500;"></p>
+                <button id="legal-toggle" style="background: none; border: none; cursor: pointer; font-weight: bold; color: #4b5563; text-decoration: underline; padding: 5px;">
+                    免責事項 (クリックで表示)
+                </button>
+            </div>
+        
+            <div id="legal-details" style="display: none; margin-top: 15px; border-top: 1px solid #d1d5db; padding-top: 15px; text-align: left; max-width: 800px; margin-left: auto; margin-right: auto; line-height: 1.6;">
+                <p style="text-align: center; font-weight: bold; margin-bottom: 5px; color: #374151;">
+                    Copyright &copy; 2025 (株)地圏総合コンサルタント All Rights Reserved.
+                </p>
+                <p style="font-size: 11px; color: #6b7280; text-align: center; margin-bottom: 15px;">
+                    Developed by: Naoya.Onozato
+                </p>
+                
+                <div style="background-color: #fff7ed; border: 1px solid #fdba74; color: #c2410c; padding: 10px; border-radius: 6px; margin-bottom: 15px; font-weight: bold; text-align: center;">
+                    ⚠ 本システムの再配布・第三者への提供を禁止します。
+                </div>
+        
+                <div style="font-size: 11px; color: #4b5563;">
+                    <p style="margin-bottom: 10px;">
+                        <strong>【免責事項】</strong><br>
+                        本システムの利用によって生じたいかなる損害についても、開発者および著作権者は一切の責任を負いません。本ツールはあくまで業務補助を目的としたものであり、出力される計算結果やグラフは、必ず専門技術者が確認・検証した上で使用してください。本システムが出力する値の正確性や完全性を保証するものではありません。
+                    </p>
+                    <p style="margin-bottom: 0;">
+                        <strong>【使用ライブラリ】</strong><br>
+                        Chart.js, Handsontable, chartjs-plugin-datalabels, PptxGenJS, JSZip
+                    </p>
+                </div>
+            </div>
+        </footer>
+    </div>
+
+    <!-- Step 4: データ入力用モーダル（ここにテーブルを移動） -->
+    <div id="inputModal" class="modal-overlay">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3>📝 データ入力・編集</h3>
+                <button class="close-btn" onclick="closeInputModal()">&times;</button>
+            </div>
+            <div class="modal-body" style="display: flex; flex-direction: column;">
+                <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px; margin-bottom: 12px;">
+                    <p class="help-text" style="margin:0;">データを入力・編集したら「閉じる」または背景をクリックしてグラフに反映させてください。</p>
+                    <div class="controls" style="margin-bottom: 0; display: flex; flex-wrap: nowrap; gap: 10px;">
+                        <button class="btn-add" onclick="addNewRow()">＋ 新規追加</button>
+                        <button class="btn-del" onclick="deleteSelectedSamples()">🗑️選択削除</button>
+                        <button class="btn-import" style="background-color: #9333ea;" onclick="openDataProcessorModal()">📋Excel取込</button>
+                        <button class="btn-export" onclick="exportCSV()">📤CSV出力</button>
+                        <label for="csvFileInput" class="btn-file btn-import">📥CSV読込</label>
+                        <input type="file" id="csvFileInput" class="file-input" accept=".csv" onchange="handleCSVImport(event)">
+                    </div>
+                </div>
+                <div class="table-container" style="flex-grow: 1;">
+                    <table id="dataTable">
+                        <thead>
+                            <tr>
+                                <th style="width: 30px;"><input type="checkbox" id="selectAllCheckbox" title="すべて選択/解除"></th>
+                                <th style="width: 40px;">No.</th>
+                                <th style="width: 120px;">地点名</th>
+                                <th style="width: 120px;">試料名</th>
+                                <th style="width: 80px;">深度(m)</th>
+                                <th style="width: 80px;">土質名</th>
+                                <th style="width: 60px;">土層</th>
+                                <th style="width: 180px;">データ (粒径[tab]通過率)</th>
+                            </tr>
+                        </thead>
+                        <tbody id="tableBody"></tbody>
+                    </table>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn-add" onclick="closeInputModal()">閉じる (グラフ更新)</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Excel取込モーダル (修正済) -->
+    <div id="dataProcessorModal" class="modal-overlay">
+        <div class="modal-content">
+            <div class="modal-header"><h3>📋 Excelデータ整形・読込 (グリッド形式)</h3><button class="close-btn" onclick="closeDataProcessorModal()">&times;</button></div>
+            <div class="modal-body" style="padding:0;">
+                <div id="processorInputArea" style="display: flex; flex-direction: column; height: 100%; overflow: hidden; padding:16px;">
+                    <div class="modal-body-grid">
+                        <div class="processor-col"><h4 style="margin-bottom: 8px;">1. 試験一覧表データ</h4><p class="help-text" style="margin-top:0; flex-shrink: 0;">Excelの「試験一覧表」から<b>ヘッダーを含まない</b>データ範囲をコピーし、下の表の左上のセルを選択して貼り付けてください。</p><div id="listTableContainer" class="handsontable-container"></div></div>
+                        <div class="processor-col"><h4 style="margin-bottom: 8px;">2. 粒度試験結果データ</h4><p class="help-text" style="margin-top:0; flex-shrink: 0;">Excelの「粒度試験結果」から<b>ヘッダーを含まない</b>データ範囲をコピーし、下の表の左上のセルを選択して貼り付けてください。</p><div id="resultsTableContainer" class="handsontable-container"></div></div>
+                    </div>
+                    <div style="margin-top:10px; text-align:right;"><button class="btn-export" onclick="processPastedData()">プレビューを表示</button></div>
+                </div>
+                <div id="processorPreviewArea" style="display: none; flex-direction: column; height: 100%; padding:16px;">
+                     <div class="table-container" style="flex-grow: 1; overflow-y: auto;"><p class="help-text" style="margin-top:0;">以下の内容で読み込みます。問題がなければ「この内容で読み込む」ボタンを押してください。</p><table id="processorPreviewTable"></table></div>
+                     <div style="margin-top:10px; display:flex; justify-content:space-between;"><button class="btn-import" onclick="backToInput()">← 入力に戻る</button><button class="btn-add" onclick="confirmImport()">この内容で読み込む</button></div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- その他モーダル (画像抽出, 土層, ヘルプ) -->
+    <div id="imageExtractorModal" class="modal-overlay">
+        <div class="modal-content">
+            <div class="modal-header"><h3>📈 グラフ画像からの曲線データ抽出</h3><button class="close-btn" onclick="imageExtractor.close()">&times;</button></div>
+            <div class="modal-body">
+                <div class="modal-body-split">
+                    <div class="controls-panel">
+                        <div id="extractorUploadArea">
+                            <div class="instruction-box"><p>1. グラフ画像ファイルをアップロードしてください。</p></div>
+                            <label for="extractorImageInput" class="btn-file btn-import" style="width: 100%; margin-top: 15px;">ファイルを選択</label>
+                            <input type="file" id="extractorImageInput" class="file-input" accept="image/*">
+                        </div>
+                        <div id="extractorMainArea" class="hidden">
+                             <div class="instruction-box"><p id="extractorInstruction"></p></div>
+                             <div id="extractorAxisInputArea" class="hidden"><div class="input-group"><label id="extractorAxisLabel" for="extractorAxisInput"></label><input type="number" id="extractorAxisInput"></div></div>
+                             <div id="extractorExtractArea" class="hidden"><p class="help-text">抽出したい曲線をクリックして点を追加してください。</p><div class="btn-group"><button id="upperCurveBtn" class="btn-sm curve-btn active" onclick="imageExtractor.switchCurve(0)">上限線 (Upper)</button><button id="lowerCurveBtn" class="btn-sm curve-btn" onclick="imageExtractor.switchCurve(1)">下限線 (Lower)</button></div></div>
+                             <div class="modal-toolbar" style="margin-top: 15px;"><button id="extractorClearPointsBtn" class="btn-sm btn-del">選択中の曲線の点をクリア</button><button id="extractorResetBtn" class="btn-sm" style="background: #6b7280; color: white;">リセット</button></div>
+                             <div class="final-actions" style="margin-top: auto;"><div style="margin-bottom: 8px; text-align: left;"><label><input type="checkbox" id="extractorCombineFill" checked> 塗りつぶし範囲として結合する</label><p class="help-text" style="margin: 2px 0 0 20px;">チェックを外すと、上限と下限が独立した2つの線として登録されます。</p></div><button id="applyExtractedDataBtn" class="btn-add" disabled>このデータを反映</button><button id="exportExtractedCSVBtn" class="btn-export" disabled>CSVとしてエクスポート</button></div>
+                        </div>
+                    </div>
+                    <div class="canvas-panel"><canvas id="extractorCanvas"></canvas></div>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div id="layerOrderModal" class="modal-overlay">
+        <div class="modal-content">
+            <div class="modal-header"><h3>↕️ 土質名から土層番号を割り当て</h3><button class="close-btn" onclick="closeLayerOrderModal()">&times;</button></div>
+            <div class="modal-body"><p class="help-text" style="margin-top:0; margin-bottom: 15px;">「土質名」のリストをドラッグ＆ドロップで並び替えてください。<br>保存すると、この<b>土質名の順序</b>に基づいて、データ入力一覧の<b>「土層」列が番号(1, 2, 3...)で上書き</b>されます。</p><ul id="layerOrderList"></ul></div>
+            <div class="modal-footer"><button class="btn-add" onclick="saveLayerOrder()">この順序で番号を割り当て</button></div>
+        </div>
+    </div>
+    <div id="helpModal" class="modal-overlay">
+        <div class="modal-content">
+            <div class="modal-header"><h3>ℹ️ 粒度試験結果・整理システム 取扱説明</h3><button class="close-btn">&times;</button></div>
+            <div class="modal-body">
+                <p>このシステムは、粒度試験の結果を入力し、粒径加積曲線や粒度構成グラフを効率的に作成・整理するためのツールです。</p>
+                <h4>1. 基本的な使い方</h4>
+                <ol>
+                    <li><strong>データの入力</strong>
+                        <ul>
+                            <li>サイドバーの <code>[✏️ データ編集]</code> ボタンを押すと、データ入力画面が開きます。</li>
+                            <li><code>[+ 新規追加]</code> ボタンで行を追加し、「地点名」「試料名」「深度」などの基本情報を入力します。</li>
+                            <li><code>[データ (粒径[tab]通過率)]</code> の欄には、Excelから粒径と通過率の2列をコピーして、そのまま貼り付けることができます。</li>
+                            <li><code>[📋 Excelデータ取込]</code> を使うと、試験一覧表と結果表をまとめて貼り付けて取り込めます。</li>
+                        </ul>
+                    </li>
+                    <li><strong>グラフの確認・出力</strong>
+                        <ul>
+                            <li>メイン画面のタブを切り替えて「粒径加積曲線」「粒度構成」を確認します。</li>
+                            <li>サイドバーの「グラフ表示設定」でグリッドや凡例を調整できます。</li>
+                            <li>サイドバー下部の <code>[PPTX出力]</code> や <code>[ZIP保存]</code> で結果をエクスポートできます。</li>
+                        </ul>
+                    </li>
+                </ol>
+            </div>
+        </div>
+    </div>
+
+<script>
+// サイドバー開閉
+function toggleSidebarPanel(contentId, arrowId) {
+    const content = document.getElementById(contentId);
+    const arrow = document.getElementById(arrowId);
+    if (content.style.display === 'none') {
+        content.style.display = 'block';
+        arrow.innerHTML = '▼';
+    } else {
+        content.style.display = 'none';
+        arrow.innerHTML = '▶';
+    }
+}
+
+// データ入力モーダル制御 (Step 4追加)
+function openInputModal() {
+    document.getElementById('inputModal').style.display = 'flex';
+}
+function closeInputModal() {
+    document.getElementById('inputModal').style.display = 'none';
+    renderAllCharts(); // 閉じる時にグラフ更新
+}
+
+let samples = [];
+let standardGroups = [];
+let customLayerOrder = [];
+
+const colors = ['#e6194b', '#3cb44b', '#ffe119', '#4363d8', '#f58231', '#911eb4', '#46f0f0', '#f032e6', '#bcf60c', '#fabebe', '#008080', '#e6beff', '#9a6324', '#fffac8', '#800000', '#aaffc3', '#808000', '#ffd8b1', '#000075', '#808080'];
+const pointStyles = ['circle', 'rect', 'triangle', 'rectRot', 'star', 'cross', 'crossRot'];
+let chartInstances = {};
+let compositionChart = null;
+let compositionChartInstances = {};
+
+const soilClassifications = [
+    { name: '粘土', min: 0.001, max: 0.005, color: 'rgba(59, 130, 246, 0.2)' },
+    { name: 'シルト', min: 0.005, max: 0.075, color: 'rgba(96, 165, 250, 0.2)' },
+    { name: '細砂', min: 0.075, max: 0.425, color: 'rgba(250, 204, 21, 0.2)' },
+    { name: '粗砂', min: 0.425, max: 2,    color: 'rgba(251, 146, 60, 0.2)' },
+    { name: '細礫', min: 2,    max: 4.75, color: 'rgba(248, 113, 113, 0.2)' },
+    { name: '中礫', min: 4.75, max: 19,   color: 'rgba(239, 68, 68, 0.25)' },
+    { name: '粗礫', min: 19,   max: 75,   color: 'rgba(220, 38, 38, 0.25)' },
+];
+
+const soilClassificationPlugin = {
+    id: 'soilClassificationLegend',
+    beforeDraw(chart, args, options) {
+        const showBackground = options.showBackground;
+        const { ctx, chartArea: { top, bottom, left, right }, scales: { x } } = chart;
+        const legendTop = 0, legendHeight = options.legendHeight || 30;
+        const numberFont = options.numberFont || '11px sans-serif';
+        const labelFont = options.labelFont || 'bold 12px sans-serif';
+        const textColor = '#000000';
+        const lineColor = options.lineColor || '#94a3b8';
+        ctx.save();
+        ctx.strokeStyle = lineColor; ctx.lineWidth = 1;
+        soilClassifications.forEach(classification => {
+            const xStart = x.getPixelForValue(classification.min);
+            const xEnd = x.getPixelForValue(classification.max);
+            const drawXStart = Math.max(xStart, left);
+            const drawXEnd = Math.min(xEnd, right);
+            const width = drawXEnd - drawXStart;
+            if (width <= 0) return;
+            if (showBackground) {
+                ctx.fillStyle = classification.color;
+                ctx.fillRect(drawXStart, top, width, bottom - top);
+                ctx.fillStyle = classification.color.replace(/0\.\d+\)/, '0.6)');
+                ctx.fillRect(drawXStart, legendTop, width, legendHeight - 1);
+            }
+            ctx.fillStyle = textColor; ctx.font = labelFont; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+            ctx.fillText(classification.name, drawXStart + width / 2, legendTop + legendHeight / 2);
+        });
+        const boundaries = [...new Set(soilClassifications.flatMap(s => [s.min, s.max]))].filter(v => v > 0.001 && v < 75);
+        boundaries.forEach(boundaryValue => {
+            const xPos = x.getPixelForValue(boundaryValue);
+            if (xPos < left || xPos > right) return;
+            ctx.beginPath(); ctx.moveTo(xPos, legendTop); ctx.lineTo(xPos, legendTop + legendHeight); ctx.stroke();
+            ctx.font = numberFont; ctx.textAlign = 'center'; ctx.textBaseline = 'top'; ctx.fillStyle = textColor;
+            ctx.fillText(boundaryValue, xPos, legendTop + legendHeight + 2);
+        });
+        ctx.strokeRect(left, legendTop, right - left, legendHeight - 1);
+        ctx.restore();
+    }
+};
+
+function hexToRgba(hex, alpha) {
+    let r=0,g=0,b=0;
+    if(hex.length==4){r="0x"+hex[1]+hex[1];g="0x"+hex[2]+hex[2];b="0x"+hex[3]+hex[3];}
+    else if(hex.length==7){r="0x"+hex[1]+hex[2];g="0x"+hex[3]+hex[4];b="0x"+hex[5]+hex[6];}
+    return`rgba(${+r},${+g},${+b},${alpha})`;
+}
+
+const referenceCurvePlugin = {
+    id: 'referenceCurvePlugin',
+    beforeDatasetsDraw(chart, args, options) {
+        const standards = options.standards || [];
+        if (standards.length === 0) return;
+        const { ctx, scales: { x, y } } = chart;
+        ctx.save();
+        standards.forEach(standard => {
+            if (!standard.visible || !standard.points || standard.points.length < 2) return;
+            const points = standard.points;
+            ctx.beginPath();
+            ctx.moveTo(x.getPixelForValue(points[0].x), y.getPixelForValue(points[0].y));
+            for (let i = 1; i < points.length; i++) {
+                ctx.lineTo(x.getPixelForValue(points[i].x), y.getPixelForValue(points[i].y));
+            }
+            if (standard.fill) {
+                ctx.fillStyle = hexToRgba(standard.color, standard.opacity);
+                ctx.closePath();
+                ctx.fill();
+            } else {
+                ctx.strokeStyle = standard.color;
+                ctx.lineWidth = 2;
+                ctx.stroke();
+            }
+        });
+        const standardsWithComments = standards.filter(s => s.visible && s.fill && s.comment && s.points.length > 0);
+        if (standardsWithComments.length > 0) {
+            const commentPositions = [];
+            const fontSize = 12;
+            standardsWithComments.forEach(standard => {
+                const pixelPoints = standard.points.map(p => ({ px: x.getPixelForValue(p.x), py: y.getPixelForValue(p.y) }));
+                const minPx = Math.min(...pixelPoints.map(p => p.px));
+                const maxPx = Math.max(...pixelPoints.map(p => p.px));
+                const minPy = Math.min(...pixelPoints.map(p => p.py));
+                const maxPy = Math.max(...pixelPoints.map(p => p.py));
+                commentPositions.push({ text: standard.comment, x: (minPx + maxPx) / 2, y: (minPy + maxPy) / 2, height: fontSize });
+            });
+            commentPositions.sort((a, b) => a.y - b.y);
+            const margin = 4;
+            for (let i = 1; i < commentPositions.length; i++) {
+                const prev = commentPositions[i-1];
+                const current = commentPositions[i];
+                if (current.y - current.height / 2 < prev.y + prev.height / 2 + margin) {
+                    current.y = prev.y + prev.height / 2 + margin + current.height / 2;
+                }
+            }
+            commentPositions.forEach(pos => {
+                ctx.fillStyle = '#000000';
+                ctx.font = `bold ${fontSize}px sans-serif`;
+                ctx.textAlign = 'center';
+                ctx.textBaseline = 'middle';
+                ctx.fillText(pos.text, pos.x, pos.y);
+            });
+        }
+        ctx.restore();
+    }
+};
+
+Chart.register(ChartDataLabels);
+const customCanvasBackgroundColor = {
+    id: 'customCanvasBackgroundColor',
+    beforeDraw: (chart) => {
+        const bgColor = chart.options.plugins.backgroundColor;
+        if (bgColor) {
+            const { ctx } = chart;
+            ctx.save();
+            ctx.globalCompositeOperation = 'destination-over';
+            ctx.fillStyle = bgColor;
+            ctx.fillRect(0, 0, chart.width, chart.height);
+            ctx.restore();
+        }
+    }
+};
+Chart.register(customCanvasBackgroundColor);
+
+// 初期化フロー
+window.onload = function() {
+    imageExtractor.init();
+    
+    // データ復元を試みる
+    loadStandardsFromLocalStorage();
+    
+    // UI構築
+    populateStandardGroupSelector();
+    renderReferenceStandardsTable();
+    renderTable();
+    renderAllCharts();
+    
+    setupHelpModal();
+    setupLayerOrderModalDragAndDrop();
+    
+    // フッター機能の初期化
+    const lastUpdatedEl = document.getElementById('lastUpdated');
+    if (lastUpdatedEl) { 
+        lastUpdatedEl.textContent = `最終更新日: 2025年11月28日`; 
+    }
+
+    const legalToggle = document.getElementById('legal-toggle');
+    const legalDetails = document.getElementById('legal-details');
+    
+    if (legalToggle && legalDetails) {
+        legalToggle.addEventListener('click', function() {
+            const isHidden = legalDetails.style.display === 'none';
+            legalDetails.style.display = isHidden ? 'block' : 'none';
+            legalToggle.textContent = isHidden ? '免責事項 (クリックで非表示)' : '免責事項 (クリックで表示)';
+            
+            // 表示時に一番下までスクロール（ユーザビリティ向上）
+            if (isHidden) {
+                setTimeout(() => {
+                    legalDetails.scrollIntoView({ behavior: 'smooth', block: 'end' });
+                }, 100);
+            }
+        });
+    }
+};
+
+function setupHelpModal() {
+    const helpModal = document.getElementById('helpModal');
+    const helpButton = document.getElementById('helpButton');
+    const closeBtn = helpModal.querySelector('.close-btn');
+    helpButton.onclick = () => { helpModal.style.display = 'flex'; };
+    closeBtn.onclick = () => { helpModal.style.display = 'none'; };
+    helpModal.onclick = (event) => { if (event.target === helpModal) { helpModal.style.display = 'none'; } };
+}
+
+function openTab(evt, tabName) {
+    document.querySelectorAll('.tab-content').forEach(tc => tc.style.display = 'none');
+    document.querySelectorAll('.tab-link').forEach(tl => tl.classList.remove('active'));
+    document.getElementById(tabName).style.display = 'block';
+    evt.currentTarget.classList.add('active');
+    setTimeout(() => {
+        if (tabName === 'GradationCurve') { Object.values(chartInstances).forEach(chart => chart?.resize()); }
+        if (tabName === 'Composition') { if (compositionChart) compositionChart.resize(); Object.values(compositionChartInstances).forEach(chart => chart?.resize()); }
+    }, 10);
+}
+
+function populateStandardGroupSelector() {
+    const selector = document.getElementById('standardGroupSelector');
+    selector.innerHTML = '';
+    ['all', 'none', ...standardGroups.map(g => g.groupName)].forEach(name => {
+        const option = document.createElement('option');
+        option.value = name;
+        option.textContent = {all: 'すべて表示', none: '表示しない'}[name] || name;
+        selector.appendChild(option);
+    });
+    selector.value = 'none';
+}
+
+function renderReferenceStandardsTable(openIndex = -1) {
+    const container = document.getElementById('standardsContainer');
+    container.innerHTML = standardGroups.map((group, groupIndex) => `
+        <div class="accordion-group">
+            <div class="accordion-header" onclick="toggleAccordion(this)">
+                <span class="toggle-icon">${openIndex === groupIndex ? '▼' : '▶'}</span>
+                <input type="text" class="group-name-input" value="${group.groupName}" oninput="updateGroupName(${groupIndex}, this.value)" placeholder="グループ名を入力" onclick="event.stopPropagation()">
+                <div class="header-actions"><button class="btn-del" onclick="event.stopPropagation(); deleteGroup(${groupIndex})">グループ削除</button></div>
+            </div>
+            <div class="accordion-content ${openIndex === groupIndex ? 'open' : ''}">
+                <div class="table-container">
+                    ${group.standards.length > 0 ? `
+                    <table>
+                        <thead><tr><th>表示</th><th>基準名称</th><th>コメント</th><th>塗りつぶし</th><th>色</th><th>透明度</th><th>データ</th><th>アクション</th></tr></thead>
+                        <tbody>
+                        ${group.standards.map((standard, standardIndex) => `
+                            <tr>
+                                <td class="cell-center"><input type="checkbox" ${standard.visible ? 'checked' : ''} onchange="updateStandard(${groupIndex}, ${standardIndex}, 'visible', this.checked)"></td>
+                                <td><input type="text" value="${standard.name}" oninput="updateStandard(${groupIndex}, ${standardIndex}, 'name', this.value)"></td>
+                                <td><input type="text" value="${standard.comment || ''}" oninput="updateStandard(${groupIndex}, ${standardIndex}, 'comment', this.value, this)"></td>
+                                <td class="cell-center"><input type="checkbox" ${standard.fill ? 'checked' : ''} onchange="updateStandard(${groupIndex}, ${standardIndex}, 'fill', this.checked)"></td>
+                                <td><input type="color" value="${standard.color}" oninput="updateStandard(${groupIndex}, ${standardIndex}, 'color', this.value)"></td>
+                                <td><input type="number" min="0" max="1" step="0.05" value="${standard.opacity}" oninput="updateStandard(${groupIndex}, ${standardIndex}, 'opacity', this.valueAsNumber)"></td>
+                                <td><textarea class="data-editor" oninput="updateStandard(${groupIndex}, ${standardIndex}, 'dataStr', this.value)">${standard.dataStr}</textarea></td>
+                                <td style="padding: 4px; display: flex; flex-direction: column; gap: 4px; min-width: 110px;">
+                                    <button class="btn-import btn-sm" style="background-color: #8b5cf6; width: 100%;" onclick="imageExtractor.open(${groupIndex}, ${standardIndex})">画像から読取</button>
+                                    <button class="btn-del btn-sm" style="width: 100%;" onclick="deleteStandard(${groupIndex}, ${standardIndex})">削除</button>
+                                </td>
+                            </tr>`).join('')}
+                        </tbody>
+                    </table>` : `<p class="help-text" style="text-align:center;">基準がありません。</p>`}
+                </div>
+                <button class="btn-add" onclick="addNewStandardToGroup(${groupIndex})">＋ このグループに基準を追加</button>
+            </div>
+        </div>
+    `).join('');
+}
+function toggleAccordion(headerEl) {
+    const content = headerEl.nextElementSibling;
+    const icon = headerEl.querySelector('.toggle-icon');
+    const isOpen = content.classList.toggle('open');
+    icon.textContent = isOpen ? '▼' : '▶';
+}
+function addNewGroup() { standardGroups.push({ groupName: `新規グループ ${standardGroups.length + 1}`, standards: [] }); updateAndRenderStandards(standardGroups.length - 1); }
+function deleteGroup(index) { if (confirm(`グループ「${standardGroups[index].groupName}」を削除しますか？`)) { standardGroups.splice(index, 1); updateAndRenderStandards(); } }
+function addNewStandardToGroup(groupIndex) {
+    standardGroups[groupIndex].standards.push({
+        id: Date.now() + Math.random(), name: `新規基準`, comment: '', visible: true, fill: true, color: '#808080', opacity: 0.25,
+        dataStr: '# 上限\n0.1, 80\n1, 100\n---\n# 下限\n0.1, 20\n1, 40', points: []
+    });
+    updateAndRenderStandards(groupIndex);
+}
+function deleteStandard(groupIndex, standardIndex) { if (confirm('この基準を削除しますか？')) { standardGroups[groupIndex].standards.splice(standardIndex, 1); updateAndRenderStandards(groupIndex); } }
+function updateAndRenderStandards(openIndex = -1) {
+    saveStandardsToLocalStorage();
+    populateStandardGroupSelector();
+    renderReferenceStandardsTable(openIndex);
+    renderAllCharts();
+}
+let standardDebounceTimer;
+function updateStandard(gIdx, sIdx, field, value) {
+    standardGroups[gIdx].standards[sIdx][field] = value;
+    clearTimeout(standardDebounceTimer);
+    standardDebounceTimer = setTimeout(() => { updateAndRenderStandards(gIdx); }, 300);
+}
+function updateGroupName(index, name) {
+    standardGroups[index].groupName = name;
+    clearTimeout(standardDebounceTimer);
+    standardDebounceTimer = setTimeout(() => { updateAndRenderStandards(index); }, 300);
+}
+
+function parseStandardPolygon(dataStr, isFill) {
+    const parse = (str) => (str || '').trim().split(/[\r\n]+/).map(line => {
+        if (line.trim().startsWith('#') || line.trim() === '') return null;
+        const [size, percent] = line.split(/[,\t\s]+/).map(parseFloat);
+        return !isNaN(size) && !isNaN(percent) ? { x: size, y: percent } : null;
+    }).filter(Boolean);
+    if (isFill) {
+        const [upperStr, lowerStr] = (dataStr || '').trim().split(/\n---\n/);
+        const upper = parse(upperStr).sort((a, b) => a.x - b.x);
+        const lower = parse(lowerStr).sort((a, b) => b.x - a.x);
+        return [...upper, ...lower];
+    }
+    return parse(dataStr);
+}
+function saveStandardsToLocalStorage() { localStorage.setItem('referenceStandards', JSON.stringify(standardGroups)); }
+function loadStandardsFromLocalStorage() {
+    try {
+        const stored = localStorage.getItem('referenceStandards');
+        if (stored && stored !== "undefined") {
+            standardGroups = JSON.parse(stored);
+        } else {
+            // 初期データ
+            standardGroups = [{
+                groupName: "液状化関連", standards: [{
+                    id: 1, name: '液状化の可能性のある範囲', comment: '注意', visible: true, fill: true, color: '#6b7280', opacity: 0.25,
+                    dataStr: '0.06, 40\n0.1, 68\n0.2, 90\n0.6, 100\n10, 100\n---\n0.075, 0\n0.15, 5\n0.4, 20\n1.0, 45\n2.0, 65\n10, 95'
+                }]
+            }];
+        }
+    } catch(e) { console.error("Load Error", e); standardGroups = []; }
+    // 互換性補正
+    standardGroups.forEach(g => g.standards.forEach(s => { s.opacity = s.opacity ?? 0.25; s.comment = s.comment ?? ''; }));
+}
+function exportStandards() {
+    const blob = new Blob([JSON.stringify(standardGroups, null, 2)], { type: 'application/json' });
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = 'grain_size_standards.json';
+    a.click();
+    URL.revokeObjectURL(a.href);
+}
+function handleFileRead(file, callback) {
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = (e) => callback(e.target.result);
+    reader.readAsText(file);
+    // event.target.value = ''; // 呼び出し元でリセットする
+}
+function handleStandardsImport(event) {
+    handleFileRead(event.target.files[0], (text) => {
+        try {
+            const imported = JSON.parse(text);
+            if (!Array.isArray(imported)) throw new Error('Invalid format');
+            standardGroups = imported;
+            updateAndRenderStandards();
+            alert('基準設定を読み込みました。');
+        } catch (e) { alert('ファイルの読み込みに失敗しました。'); }
+    });
+    event.target.value = '';
+}
+function renderTable() {
+    document.getElementById('tableBody').innerHTML = samples.map((sample, index) => `
+        <tr>
+            <td class="cell-center"><input type="checkbox" class="row-checkbox" data-index="${index}"></td>
+            <td style="text-align:center; background:#f9fafb;">${index + 1}</td>
+            <td><input type="text" value="${sample.location || ''}" oninput="updateSample(${index}, 'location', this.value)"></td>
+            <td><input type="text" value="${sample.name}" oninput="updateSample(${index}, 'name', this.value)"></td>
+            <td><input type="number" value="${sample.depth || ''}" oninput="updateSample(${index}, 'depth', this.value)"></td>
+            <td><input type="text" value="${sample.soilType}" oninput="updateSample(${index}, 'soilType', this.value)"></td>
+            <td><input type="text" value="${sample.layer}" oninput="updateSample(${index}, 'layer', this.value)"></td>
+            <td><textarea class="data-editor" oninput="updateSample(${index}, 'dataStr', this.value)">${sample.dataStr || ''}</textarea></td>
+        </tr>
+    `).join('');
+    document.getElementById('selectAllCheckbox').onchange = (e) =>
+        document.querySelectorAll('.row-checkbox').forEach(cb => cb.checked = e.target.checked);
+    renderLocationFilter();
+}
+let debounceTimer;
+function updateSample(index, field, value) {
+    samples[index][field] = value;
+    clearTimeout(debounceTimer);
+    debounceTimer = setTimeout(() => {
+        renderAllCharts();
+        if (field === 'location') renderLocationFilter();
+    }, 300);
+}
+
+function addNewRow() {
+    const newId = samples.length > 0 ? Math.max(...samples.map(s => s.id)) + 1 : 1;
+    samples.push({ id: newId, location: '', name: `試料${newId}`, depth: '', soilType: '', layer: '1', dataStr: '' });
+    renderTable();
+    renderAllCharts();
+}
+
+function deleteSelectedSamples() {
+    const indices = [...document.querySelectorAll('.row-checkbox:checked')].map(cb => parseInt(cb.dataset.index, 10));
+    if (indices.length === 0) return alert('削除する試料を選択してください。');
+    if (confirm(`${indices.length}件の試料を削除しますか？`)) {
+        samples = samples.filter((_, i) => !indices.includes(i));
+        renderTable();
+        renderAllCharts();
+    }
+}
+
+function renderLocationFilter() {
+    const container = document.getElementById('locationFilterContainer');
+    const locations = [...new Set(samples.map(s => s.location || '（地点名なし）'))].sort();
+    if (locations.length <= 1) {
+        container.style.display = 'none';
+        return;
+    }
+    container.style.display = 'flex';
+    container.innerHTML = `<div style="font-weight: 500;">地点で絞り込み:</div><div style="display: flex; flex-wrap: wrap; gap: 10px;">` +
+        locations.map(loc => `<label style="display:flex; align-items:center; gap:5px; cursor:pointer;"><input type="checkbox" class="location-filter-cb" value="${loc}" checked onchange="renderAllCharts()"> ${loc}</label>`).join('') +
+        `</div>`;
+}
+
+function getFilteredSamples() {
+    const cbs = document.querySelectorAll('.location-filter-cb');
+    if (cbs.length === 0) return [...samples];
+    const selected = [...cbs].filter(cb => cb.checked).map(cb => cb.value);
+    return samples.filter(s => selected.includes(s.location || '（地点名なし）'));
+}
+
+function parseDataString(str) {
+    return (str || '').trim().split(/[\r\n]+/).map(line => {
+        const [size, percent] = line.split(/[,\t\s]+/).map(parseFloat);
+        return !isNaN(size) && !isNaN(percent) ? { x: size, y: percent } : null;
+    }).filter(Boolean).sort((a, b) => b.x - a.x);
+}
+
+function renderAllCharts() {
+    renderGradationCharts();
+    renderCompositionChart();
+}
+
+function updateAllChartOptions() {
+    const groupingCriteria = document.getElementById('groupingCriteria').value;
+    const getGroupKey = (sample) => {
+        switch (groupingCriteria) {
+            case 'location': return sample.location || '（地点名なし）';
+            case 'soilType': return sample.soilType || '（土質名なし）';
+            case 'all':      return 'すべての試料';
+            case 'each':     return sample.id;
+            default: return sample.layer || '（土層なし）';
+        }
+    };
+    const getGroupTitle = (groupKey, groupSamples) => {
+        const firstSample = groupSamples[0];
+        switch (groupingCriteria) {
+            case 'location': return `地点名: ${groupKey}`;
+            case 'soilType':
+                const locations = [...new Set(groupSamples.map(s => s.location).filter(Boolean))].join(', ');
+                return `土質名: ${groupKey}` + (locations ? ` / 地点: ${locations}` : '');
+            case 'all': return 'すべての試料';
+            case 'each': return `試料: ${firstSample.location || ''} ${firstSample.name} (GL-${firstSample.depth || '?'}m)`;
+            default:
+                const soilTypes = [...new Set(groupSamples.map(s => s.soilType).filter(Boolean))].join(', ');
+                return `土層: ${groupKey}` + (soilTypes ? ` / 土質名: ${soilTypes}` : '');
+        }
+    };
+    const filteredSamples = getFilteredSamples();
+    const groupedSamples = filteredSamples.reduce((acc, sample) => {
+        const key = getGroupKey(sample);
+        if (!acc[key]) acc[key] = [];
+        acc[key].push(sample);
+        return acc;
+    }, {});
+
+    Object.entries(chartInstances).forEach(([groupKey, chart]) => {
+        if (!chart) return;
+        const options = getChartOptions();
+        const groupSamples = groupedSamples[groupKey] || [];
+        if (groupSamples.length > 0) {
+            const titleText = getGroupTitle(groupKey, groupSamples) + options.plugins.titleSuffix;
+            chart.options.plugins.title.text = titleText;
+        }
+        Object.assign(chart.options.plugins.legend, options.plugins.legend);
+        chart.options.plugins.datalabels.display = options.plugins.datalabels.display;
+        chart.options.plugins.soilClassificationLegend.showBackground = options.plugins.soilClassificationLegend.showBackground;
+        chart.options.scales.x.grid.display = options.scales.x.grid.display;
+        chart.options.scales.y.grid.display = options.scales.y.grid.display;
+        chart.canvas.parentElement.style.height = `${document.getElementById('chartHeightInput').value}px`;
+        chart.update();
+    });
+}
+
+function getChartOptions() {
+    const textColor = '#000000';
+    const selectedGroup = document.getElementById('standardGroupSelector').value;
+    let standardsToRender = [];
+    let titleSuffix = '';
+    if (selectedGroup === 'all') {
+        standardsToRender = standardGroups.flatMap(g => g.standards);
+    } else if (selectedGroup !== 'none') {
+        const group = standardGroups.find(g => g.groupName === selectedGroup);
+        if (group) {
+            standardsToRender = group.standards;
+            titleSuffix = ` (基準: ${selectedGroup})`;
+        }
+    }
+    standardsToRender.forEach(s => s.points = parseStandardPolygon(s.dataStr, s.fill));
+
+    return {
+        animation: { duration: 0 }, responsive: true, maintainAspectRatio: false,
+        layout: { padding: { top: 40 } },
+        scales: {
+            x: { type: 'logarithmic', min: 0.001, max: 100, title: { display: true, text: '粒径 (mm)', color: textColor }, grid: { display: document.getElementById('gridToggle').checked, color: document.getElementById('soilBgToggle').checked ? '#d1d5db' : '#d1d5db' }, ticks: { color: textColor, callback: v => [0.001, 0.01, 0.1, 1, 10, 100].includes(v) ? v : '', autoSkip: false, maxRotation: 0 } },
+            y: { min: 0, max: 100, title: { display: true, text: '通過質量百分率 (%)', color: textColor }, grid: { display: document.getElementById('gridToggle').checked, color: document.getElementById('soilBgToggle').checked ? '#d1d5db' : '#d1d5db' }, ticks: { color: textColor } }
+        },
+        plugins: {
+            title: { display: true, align: 'start', font: { size: 16, weight: 'bold' }, padding: { bottom: 10 }, color: textColor, text: '' },
+            legend: {
+                position: document.getElementById('legendStyleToggle').checked ? 'right' : 'bottom',
+                labels: {
+                    font: { size: parseInt(document.getElementById('legendFontSize').value, 10) || 12 },
+                    boxWidth: parseInt(document.getElementById('legendMarkerSize').value, 10) || 12,
+                    boxHeight: parseInt(document.getElementById('legendMarkerSize').value, 10) || 12,
+                    usePointStyle: true, color: textColor,
+                    generateLabels: function(chart) {
+                        const originalLabels = Chart.defaults.plugins.legend.labels.generateLabels(chart);
+                        const markerVisible = document.getElementById('markerToggle').checked;
+                        if (!markerVisible) { originalLabels.forEach(label => { label.pointStyle = 'rect'; }); }
+                        return originalLabels;
+                    }
+                }
+            },
+            soilClassificationLegend: { legendHeight: 30, showBackground: document.getElementById('soilBgToggle').checked },
+            referenceCurvePlugin: { standards: standardsToRender },
+            datalabels: { display: document.getElementById('dataLabelsToggle').checked, align: 'top', backgroundColor: 'rgba(255,255,255,0.7)', borderRadius: 4, color: textColor, font: { size: 10 }, formatter: p => p.y.toFixed(1) },
+            titleSuffix: titleSuffix
+        }
+    };
+}
+function renderGradationCharts() {
+    const container = document.getElementById('chartsContainer');
+    const filteredSamples = getFilteredSamples();
+    const groupingCriteria = document.getElementById('groupingCriteria').value;
+    const getGroupKey = (sample) => {
+        switch (groupingCriteria) {
+            case 'location': return sample.location || '（地点名なし）';
+            case 'soilType': return sample.soilType || '（土質名なし）';
+            case 'all':      return 'すべての試料';
+            case 'each':     return sample.id;
+            default: return sample.layer || '（土層なし）';
+        }
+    };
+    const getGroupTitle = (groupKey, groupSamples) => {
+        const firstSample = groupSamples[0];
+        switch (groupingCriteria) {
+            case 'location': return `地点名: ${groupKey}`;
+            case 'soilType':
+                const locations = [...new Set(groupSamples.map(s => s.location).filter(Boolean))].join(', ');
+                return `土質名: ${groupKey}` + (locations ? ` / 地点: ${locations}` : '');
+            case 'all':      return 'すべての試料';
+            case 'each': return `試料: ${firstSample.location || ''} ${firstSample.name} (GL-${firstSample.depth || '?'}m)`;
+            default:
+                const soilTypes = [...new Set(groupSamples.map(s => s.soilType).filter(Boolean))].join(', ');
+                return `土層: ${groupKey}` + (soilTypes ? ` / 土質名: ${soilTypes}` : '');
+        }
+    };
+    const groupedSamples = filteredSamples.reduce((acc, sample) => {
+        const key = getGroupKey(sample);
+        if (!acc[key]) acc[key] = [];
+        acc[key].push(sample);
+        return acc;
+    }, {});
+    const groupKeys = Object.keys(groupedSamples).sort((a, b) => String(a).localeCompare(String(b), undefined, { numeric: true }));
+
+    Object.keys(chartInstances).filter(key => !groupKeys.includes(String(key))).forEach(key => {
+        chartInstances[key]?.destroy();
+        delete chartInstances[key];
+        document.querySelector(`.chart-box[data-group-key='${key}']`)?.remove();
+    });
+    
+    const fragment = document.createDocumentFragment();
+    groupKeys.forEach(groupKey => {
+        let box = container.querySelector(`.chart-box[data-group-key='${groupKey}']`);
+        if (!box) {
+             box = document.createElement('div');
+             box.className = 'chart-box';
+             box.dataset.groupKey = groupKey;
+             box.innerHTML = `<div class="chart-actions"><button class="btn-download" onclick="downloadChartAsImage('gradation', '${groupKey}')">画像保存</button></div><canvas></canvas>`;
+        }
+        fragment.appendChild(box);
+    });
+    container.innerHTML = '';
+    container.appendChild(fragment);
+
+    groupKeys.forEach(groupKey => {
+        const commonOptions = getChartOptions();
+        const groupSamples = groupedSamples[groupKey];
+        const datasets = groupSamples.map((s, i) => ({
+            label: [...document.querySelectorAll('.legend-option:checked')].map(opt => ({
+                location: s.location, name: s.name, depth: s.depth ? `GL-${s.depth}m` : '', soilType: s.soilType
+            }[opt.value])).filter(Boolean).join(', ') || `試料${s.id}`,
+            data: parseDataString(s.dataStr),
+            borderColor: colors[i % colors.length], backgroundColor: colors[i % colors.length],
+            pointStyle: pointStyles[i % pointStyles.length], radius: document.getElementById('markerToggle').checked ? 4 : 0,
+            borderWidth: 2, showLine: true, tension: 0.1, clip: false 
+        }));
+        const titleText = getGroupTitle(groupKey, groupSamples) + commonOptions.plugins.titleSuffix;
+        const box = container.querySelector(`.chart-box[data-group-key='${groupKey}']`);
+        box.style.height = `${document.getElementById('chartHeightInput').value}px`;
+        
+        if (chartInstances[groupKey]) {
+            const chart = chartInstances[groupKey];
+            chart.data.datasets = datasets;
+            chart.options.plugins.title.text = titleText;
+            Object.assign(chart.options.plugins.legend, commonOptions.plugins.legend);
+            chart.options.plugins.referenceCurvePlugin.standards = commonOptions.plugins.referenceCurvePlugin.standards;
+            chart.update();
+        } else {
+            commonOptions.plugins.title.text = titleText;
+            chartInstances[groupKey] = new Chart(box.querySelector('canvas'), { type: 'scatter', data: { datasets }, plugins: [soilClassificationPlugin, referenceCurvePlugin], options: commonOptions });
+        }
+    });
+    if (groupKeys.length === 0) container.innerHTML = '<p class="help-text" style="text-align:center;">表示するデータがありません。</p>';
+}
+
+function getPassingPercent(targetX, points, method = 'logarithmic') {
+    if (!points || points.length === 0) return 0;
+    if (targetX >= points[0].x) return points[0].y;
+    if (targetX <= points[points.length - 1].x) return points[points.length - 1].y;
+    for (let i = 0; i < points.length - 1; i++) {
+        if (points[i].x >= targetX && points[i + 1].x < targetX) {
+            const [p1, p2] = [points[i], points[i + 1]];
+            let interpolatedY;
+            if (method === 'linear') { interpolatedY = p1.y + (p2.y - p1.y) * (targetX - p1.x) / (p2.x - p1.x); } 
+            else { interpolatedY = p1.y + (p2.y - p1.y) * (Math.log(targetX) - Math.log(p1.x)) / (Math.log(p2.x) - Math.log(p1.x)); }
+            return Math.max(0, Math.min(100, interpolatedY));
+        }
+    }
+    return 0;
+}
+
+function calculateComposition(dataStr) {
+    const points = parseDataString(dataStr);
+    if (points.length < 2) return { gravel: 0, sand: 0, silt: 0, clay: 0, fc: 0 };
+    const interpolationMethod = document.getElementById('interpolationMethod')?.value || 'logarithmic';
+    const p2 = getPassingPercent(2, points, interpolationMethod);
+    const p0_075 = getPassingPercent(0.075, points, interpolationMethod);
+    const p0_005 = getPassingPercent(0.005, points, interpolationMethod);
+    const gravel = 100 - p2; const sand = p2 - p0_075; const silt = p0_075 - p0_005; const clay = p0_005;
+    return { gravel, sand, silt, clay, fc: silt + clay };
+}
+
+function renderCompositionChart() {
+    const container = document.getElementById('compositionContainer');
+    container.innerHTML = '';
+    const filteredSamples = getFilteredSamples();
+    if (filteredSamples.length === 0) { container.innerHTML = '<p class="help-text" style="text-align:center;">表示データなし</p>'; return; }
+    Object.values(compositionChartInstances).forEach(chart => chart.destroy());
+    compositionChartInstances = {};
+    if (compositionChart) { compositionChart.destroy(); compositionChart = null; }
+    const displayMode = document.getElementById('compositionDisplayMode').value;
+    const sortOrder = document.getElementById('sortOrder').value;
+    const textColor = '#000000';
+    const interpolationMethodSelect = document.getElementById('interpolationMethod');
+    const interpolationMethodText = interpolationMethodSelect.options[interpolationMethodSelect.selectedIndex].text;
+
+    if (displayMode === 'grouped') {
+        const groupedSamples = filteredSamples.reduce((acc, sample) => { const key = sample.layer || '（土層なし）'; if (!acc[key]) acc[key] = []; acc[key].push(sample); return acc; }, {});
+        const groupKeys = Object.keys(groupedSamples).sort((a, b) => String(a).localeCompare(String(b), undefined, { numeric: true }));
+        groupKeys.forEach(groupKey => {
+            const samplesInGroup = groupedSamples[groupKey];
+            const box = document.createElement('div');
+            box.className = 'chart-box';
+            box.style.height = `${40 * samplesInGroup.length + 150}px`;
+            box.innerHTML = `<div class="chart-actions"><button class="btn-download" onclick="downloadChartAsImage('composition', '${groupKey}')">画像保存</button></div><canvas></canvas>`;
+            container.appendChild(box);
+            const sortedSamples = [...samplesInGroup].sort((a, b) => {
+                if (sortOrder === 'depth') return (parseFloat(a.depth) || Infinity) - (parseFloat(b.depth) || Infinity);
+                if (sortOrder === 'location') { return String(a.location).localeCompare(String(b.location)) || samples.indexOf(a) - samples.indexOf(b); }
+                return samples.indexOf(a) - samples.indexOf(b);
+            });
+            const compositions = sortedSamples.map(s => calculateComposition(s.dataStr));
+            const canvas = box.querySelector('canvas');
+            compositionChartInstances[groupKey] = new Chart(canvas, {
+                type: 'bar',
+                data: {
+                    labels: sortedSamples.map(s => `${s.location || ''} ${s.name} (GL-${s.depth || '?'}m, ${s.soilType})`),
+                    datasets: [
+                        { type: 'line', label: 'Fc%(細粒分含有率)', data: compositions.map(c => c.fc), showLine: false, borderColor: 'transparent', pointBackgroundColor: '#1e40af', pointRadius: 5, order: 0, datalabels: { display: true, color: '#1e40af', anchor: 'end', align: 'start', offset: 4, font: { weight: 'bold' }, formatter: v => `Fc:${v.toFixed(1)}%` } },
+                        { label: '粘土分(<5μm)', data: compositions.map(c => c.clay), backgroundColor: '#3b82f6', stack: 'composition', order: 1 },
+                        { label: 'シルト分(5-75μm)', data: compositions.map(c => c.silt), backgroundColor: '#60a5fa', stack: 'composition', order: 1 },
+                        { label: '砂分(75μm-2mm)', data: compositions.map(c => c.sand), backgroundColor: '#facc15', stack: 'composition', order: 1 },
+                        { label: '礫分(>2mm)', data: compositions.map(c => c.gravel), backgroundColor: '#f97316', stack: 'composition', order: 1 },
+                    ]
+                },
+                options: {
+                    animation: { duration: 0 }, indexAxis: 'y', responsive: true, maintainAspectRatio: false,
+                    scales: { x: { stacked: true, min: 0, max: 100, title: { display: true, text: '構成率 (%)', color: textColor }, ticks: { color: textColor } }, y: { stacked: true, ticks: { color: textColor } } },
+                    plugins: {
+                        title: { display: true, text: `粒度構成 (土層: ${groupKey}, ${interpolationMethodText})`, align: 'start', font: { size: 16, weight: 'bold' }, padding: { bottom: 15 }, color: textColor },
+                        legend: { position: 'bottom', labels: { usePointStyle: true, color: textColor, generateLabels: c => c.data.datasets.map((ds, i) => ({ text: ds.label, fillStyle: ds.backgroundColor || ds.pointBackgroundColor, pointStyle: ds.type === 'line' ? 'circle' : 'rect', datasetIndex: i })) } },
+                        tooltip: { callbacks: { label: ctx => `${ctx.dataset.label || ''}: ${parseFloat(ctx.raw).toFixed(2)}%` } },
+                        datalabels: { display: ctx => ctx.dataset.type !== 'line', color: '#000000', font: { weight: 'bold' }, formatter: val => val < 0.01 ? '' : val.toFixed(1) }
+                    }
+                }
+            });
+        });
+    } else { // displayMode === 'all'
+        const box = document.createElement('div');
+        box.className = 'chart-box';
+        box.style.height = `${40 * filteredSamples.length + 150}px`;
+        box.innerHTML = `<div class="chart-actions"><button class="btn-download" onclick="downloadChartAsImage('composition', 'all')">画像保存</button></div><canvas id="compositionCanvas"></canvas>`;
+        container.appendChild(box);
+        const sortedSamples = [...filteredSamples].sort((a, b) => {
+            if (sortOrder === 'depth') return (parseFloat(a.depth) || Infinity) - (parseFloat(b.depth) || Infinity);
+            if (sortOrder === 'layer') { return String(a.layer).localeCompare(String(b.layer), undefined, { numeric: true }) || samples.indexOf(a) - samples.indexOf(b); }
+            if (sortOrder === 'location') { return String(a.location).localeCompare(String(b.location)) || samples.indexOf(a) - samples.indexOf(b); }
+            return 0;
+        });
+        const compositions = sortedSamples.map(s => calculateComposition(s.dataStr));
+        compositionChart = new Chart(document.getElementById('compositionCanvas'), {
+            type: 'bar',
+            data: {
+                 labels: sortedSamples.map(s => `${s.location || ''} ${s.name} (GL-${s.depth || '?'}m, ${s.soilType})`),
+                datasets: [
+                    { type: 'line', label: 'Fc%(細粒分含有率)', data: compositions.map(c => c.fc), showLine: false, borderColor: 'transparent', pointBackgroundColor: '#1e40af', pointRadius: 5, order: 0, datalabels: { display: true, color: '#1e40af', anchor: 'end', align: 'start', offset: 4, font: { weight: 'bold' }, formatter: v => `Fc:${v.toFixed(1)}%` } },
+                    { label: '粘土分(<5μm)', data: compositions.map(c => c.clay), backgroundColor: '#3b82f6', stack: 'composition', order: 1 },
+                    { label: 'シルト分(5-75μm)', data: compositions.map(c => c.silt), backgroundColor: '#60a5fa', stack: 'composition', order: 1 },
+                    { label: '砂分(75μm-2mm)', data: compositions.map(c => c.sand), backgroundColor: '#facc15', stack: 'composition', order: 1 },
+                    { label: '礫分(>2mm)', data: compositions.map(c => c.gravel), backgroundColor: '#f97316', stack: 'composition', order: 1 },
+                ]
+            },
+            options: {
+                animation: { duration: 0 }, indexAxis: 'y', responsive: true, maintainAspectRatio: false,
+                scales: { x: { stacked: true, min: 0, max: 100, title: { display: true, text: '構成率 (%)', color: textColor }, ticks: { color: textColor } }, y: { stacked: true, ticks: { color: textColor } } },
+                plugins: {
+                    title: { display: true, text: `粒度構成 (補間: ${interpolationMethodText}, 並び順: ${{ default: '入力順', depth: '深度順', layer: '土層順', location: '地点ごと' }[sortOrder]})`, align: 'start', font: { size: 16, weight: 'bold' }, padding: { bottom: 15 }, color: textColor },
+                    legend: { position: 'bottom', labels: { usePointStyle: true, color: textColor, generateLabels: c => c.data.datasets.map((ds, i) => ({ text: ds.label, fillStyle: ds.backgroundColor || ds.pointBackgroundColor, pointStyle: ds.type === 'line' ? 'circle' : 'rect', datasetIndex: i })) } },
+                    tooltip: { callbacks: { label: ctx => `${ctx.dataset.label || ''}: ${parseFloat(ctx.raw).toFixed(2)}%` } },
+                    datalabels: { display: ctx => ctx.dataset.type !== 'line', color: '#000000', font: { weight: 'bold' }, formatter: val => val < 4 ? '' : val.toFixed(1) }
+                }
+            }
+        });
+    }
+}
+function exportCSV() {
+    let csv = '地点名,試料名,深度(m),土質名,土層,粒径(mm),通過率(%)\n';
+    samples.forEach(s => parseDataString(s.dataStr).forEach(p => { csv += `${s.location || ''},${s.name},${s.depth || ''},${s.soilType},${s.layer},${p.x},${p.y}\n`; }));
+    const blob = new Blob(['\uFEFF' + csv], { type: 'text/csv;charset=utf-8;' });
+    const link = document.createElement("a");
+    link.href = URL.createObjectURL(blob);
+    link.download = "粒径データ.csv";
+    link.click();
+    URL.revokeObjectURL(link.href);
+}
+function handleCSVImport(event) {
+    handleFileRead(event.target.files[0], (text) => {
+        const lines = text.trim().split(/\r\n|\n/);
+        if (lines.length < 2) return alert('ヘッダー行を含むデータが2行以上必要です。');
+        const headers = lines[0].split(',').map(h => h.trim());
+        const h = Object.fromEntries(headers.map((h, i) => [h, i]));
+        if (!['試料名', '粒径(mm)', '通過率(%)'].every(req => req in h)) { return alert(`CSVには「試料名」「粒径(mm)」「通過率(%)」の列が必須です。`); }
+        const imported = {};
+        lines.slice(1).forEach(line => {
+            const cols = line.split(',');
+            const name = cols[h['試料名']]?.trim();
+            if (!name) return;
+            const location = cols[h['地点名']]?.trim() || '';
+            const layer = cols[h['土層']]?.trim() || '1';
+            const key = `${location}_${name}_${layer}`;
+            if (!imported[key]) {
+                imported[key] = { location, name, layer, depth: cols[h['深度(m)']]?.trim() || '', soilType: cols[h['土質名']]?.trim() || '', points: [] };
+            }
+            const size = parseFloat(cols[h['粒径(mm)']]), percent = parseFloat(cols[h['通過率(%)']]);
+            if (!isNaN(size) && !isNaN(percent)) imported[key].points.push({ size, percent });
+        });
+        Object.values(imported).forEach(d => {
+            const dataStr = d.points.map(p => `${p.size}\t${p.percent}`).join('\n');
+            const existing = samples.find(s => s.location === d.location && s.name === d.name && s.layer === d.layer);
+            if (existing) Object.assign(existing, { ...d, dataStr }); else samples.push({ id: Date.now() + Math.random(), ...d, dataStr });
+        });
+        alert(`${Object.keys(imported).length}件のデータを読み込み/更新しました。`);
+        renderTable(); renderAllCharts();
+    });
+    event.target.value = '';
+}
+function setChartResolution(chart, resolution) {
+    return new Promise((resolve) => {
+        const originalRatio = chart.options.devicePixelRatio || window.devicePixelRatio;
+        chart.options.devicePixelRatio = resolution;
+        chart.resize();
+        setTimeout(() => { resolve(originalRatio); }, 250);
+    });
+}
+
+async function downloadChartAsImage(type, id) {
+    let chart;
+    if (type === 'composition') { chart = (id === 'all') ? compositionChart : compositionChartInstances[id]; } else { chart = chartInstances[id]; }
+    if (!chart) return;
+    const format = document.getElementById('imageFormat').value || 'png';
+    const resolution = parseFloat(document.getElementById('pngResolution').value) || 1;
+    const extension = format === 'jpeg' ? 'jpg' : 'png';
+    const mimeType = `image/${format}`;
+    const originalBgColor = chart.options.plugins.backgroundColor;
+    if (format === 'jpeg') { chart.options.plugins.backgroundColor = 'white'; }
+    const originalRatio = await setChartResolution(chart, resolution);
+    const a = document.createElement('a');
+    a.href = chart.toBase64Image(mimeType, 1.0);
+    const fileName = chart.options.plugins.title.text.replace(/[/\\?%*:|"<>]/g, '-') || `グラフ_${id}`;
+    a.download = (type === 'composition') ? `粒度構成.${extension}` : `${fileName}.${extension}`;
+    a.click();
+    chart.options.plugins.backgroundColor = originalBgColor;
+    await setChartResolution(chart, originalRatio);
+}
+
+async function downloadAllChartsAsZip() {
+    if (Object.keys(chartInstances).length === 0) { return alert('保存するグラフがありません。'); }
+    const resolution = parseFloat(document.getElementById('pngResolution').value) || 1;
+    const format = document.getElementById('imageFormat').value || 'png';
+    const extension = format === 'jpeg' ? 'jpg' : 'png';
+    const mimeType = `image/${format}`;
+    try {
+        const zip = new JSZip();
+        const chartFolder = zip.folder("粒径加積曲線グラフ");
+        for (const id in chartInstances) {
+            const chart = chartInstances[id];
+            const originalBgColor = chart.options.plugins.backgroundColor;
+            if (format === 'jpeg') { chart.options.plugins.backgroundColor = 'white'; }
+            const originalRatio = await setChartResolution(chart, resolution);
+            const base64 = chart.toBase64Image(mimeType, 1.0).split(';base64,').pop();
+            const fileName = chart.options.plugins.title.text.replace(/[/\\?%*:|"<>]/g, '-') || `グラフ_${id}`;
+            chartFolder.file(`${fileName}.${extension}`, base64, { base64: true });
+            chart.options.plugins.backgroundColor = originalBgColor;
+            await setChartResolution(chart, originalRatio);
+        }
+        const content = await zip.generateAsync({ type: 'blob' });
+        const link = document.createElement('a');
+        link.href = URL.createObjectURL(content);
+        link.download = '粒径加積曲線グラフ一式.zip';
+        link.click();
+        URL.revokeObjectURL(link.href);
+    } catch(e) { console.error(e); alert('ZIPファイル作成中にエラーが発生しました。'); }
+}
+
+async function exportToPowerPoint() {
+    if (Object.keys(chartInstances).length === 0) { return alert('出力するグラフがありません。'); }
+    try {
+        const pptx = new PptxGenJS();
+        pptx.layout = 'LAYOUT_16x9';
+        const resolution = parseFloat(document.getElementById('pngResolution').value) || 1;
+        const sortedKeys = Object.keys(chartInstances).sort((a, b) => String(a).localeCompare(String(b), undefined, { numeric: true }));
+        for (const id of sortedKeys) {
+            const chart = chartInstances[id];
+            const slide = pptx.addSlide();
+            const originalBgColor = chart.options.plugins.backgroundColor;
+            chart.options.plugins.backgroundColor = 'white';
+            const originalRatio = await setChartResolution(chart, resolution);
+            const base64 = chart.toBase64Image('image/png', 1.0);
+            const title = chart.options.plugins.title.text;
+            const slideContentW = 9.0; const slideContentH = 4.5;
+            const chartAspectRatio = chart.height / chart.width;
+            let newW, newH;
+            if (chartAspectRatio > (slideContentH / slideContentW)) { newH = slideContentH; newW = newH / chartAspectRatio; } 
+            else { newW = slideContentW; newH = newW * chartAspectRatio; }
+            const newX = (10.0 - newW) / 2; const newY = 0.85 + (slideContentH - newH) / 2;
+            slide.addText(title, { x: 0.5, y: 0.25, w: '90%', h: 0.5, fontSize: 18, bold: true, align: 'center' });
+            slide.addImage({ data: base64, x: newX, y: newY, w: newW, h: newH });
+            chart.options.plugins.backgroundColor = originalBgColor;
+            await setChartResolution(chart, originalRatio);
+        }
+        pptx.writeFile({ fileName: '粒径加積曲線グラフ.pptx' });
+    } catch(e) { console.error(e); alert('PowerPointファイル作成中にエラーが発生しました。'); }
+}
+async function exportCompositionToPowerPoint() {
+    const displayMode = document.getElementById('compositionDisplayMode').value;
+    const chartsToExport = [];
+    if (displayMode === 'all' && compositionChart) { chartsToExport.push(compositionChart); } 
+    else { const sortedKeys = Object.keys(compositionChartInstances).sort((a, b) => String(a).localeCompare(String(b), undefined, { numeric: true })); sortedKeys.forEach(key => chartsToExport.push(compositionChartInstances[key])); }
+    if (chartsToExport.length === 0) { return alert('出力する粒度構成グラフがありません。'); }
+    try {
+        const pptx = new PptxGenJS();
+        pptx.layout = 'LAYOUT_16x9';
+        const resolution = parseFloat(document.getElementById('pngResolution').value) || 1;
+        for (const chart of chartsToExport) {
+            const slide = pptx.addSlide();
+            const originalBgColor = chart.options.plugins.backgroundColor;
+            chart.options.plugins.backgroundColor = 'white';
+            const originalRatio = await setChartResolution(chart, resolution);
+            const base64 = chart.toBase64Image('image/png', 1.0);
+            const title = chart.options.plugins.title.text;
+            const slideContentW = 9.0; const slideContentH = 4.5;
+            const chartAspectRatio = chart.height / chart.width;
+            let newW, newH;
+            if (chartAspectRatio > (slideContentH / slideContentW)) { newH = slideContentH; newW = newH / chartAspectRatio; } 
+            else { newW = slideContentW; newH = newW * chartAspectRatio; }
+            const newX = (10.0 - newW) / 2; const newY = 0.85 + (slideContentH - newH) / 2;
+            slide.addText(title, { x: 0.5, y: 0.25, w: '90%', h: 0.5, fontSize: 18, bold: true, align: 'center' });
+            slide.addImage({ data: base64, x: newX, y: newY, w: newW, h: newH });
+            chart.options.plugins.backgroundColor = originalBgColor;
+            await setChartResolution(chart, originalRatio);
+        }
+        pptx.writeFile({ fileName: '粒度構成グラフ.pptx' });
+    } catch(e) { console.error(e); alert('PowerPointファイル作成中にエラーが発生しました。'); }
+}
+async function downloadAllCompositionChartsAsZip() {
+    const displayMode = document.getElementById('compositionDisplayMode').value;
+    const chartsToExport = [];
+    if (displayMode === 'all' && compositionChart) { chartsToExport.push(compositionChart); } 
+    else { const sortedKeys = Object.keys(compositionChartInstances).sort((a, b) => String(a).localeCompare(String(b), undefined, { numeric: true })); sortedKeys.forEach(key => chartsToExport.push(compositionChartInstances[key])); }
+    if (chartsToExport.length === 0) { return alert('保存する粒度構成グラフがありません。'); }
+    const resolution = parseFloat(document.getElementById('pngResolution').value) || 1;
+    const format = document.getElementById('imageFormat').value || 'png';
+    const extension = format === 'jpeg' ? 'jpg' : 'png';
+    const mimeType = `image/${format}`;
+    try {
+        const zip = new JSZip();
+        const chartFolder = zip.folder("粒度構成グラフ");
+        for (const chart of chartsToExport) {
+            const originalBgColor = chart.options.plugins.backgroundColor;
+            if (format === 'jpeg') { chart.options.plugins.backgroundColor = 'white'; }
+            const originalRatio = await setChartResolution(chart, resolution);
+            const base64 = chart.toBase64Image(mimeType, 1.0).split(';base64,').pop();
+            const fileName = chart.options.plugins.title.text.replace(/[/\\?%*:|"<>]/g, '-') || `グラフ`;
+            chartFolder.file(`${fileName}.${extension}`, base64, { base64: true });
+            chart.options.plugins.backgroundColor = originalBgColor;
+            await setChartResolution(chart, originalRatio);
+        }
+        const content = await zip.generateAsync({ type: 'blob' });
+        const link = document.createElement('a');
+        link.href = URL.createObjectURL(content);
+        link.download = '粒度構成グラフ一式.zip';
+        link.click();
+        URL.revokeObjectURL(link.href);
+    } catch(e) { console.error(e); alert('ZIPファイル作成中にエラーが発生しました。'); }
+}
+
+const imageExtractor={state:{targetGroupIndex:null,targetStandardIndex:null,step:0,image:null,calibrationPoints:[],curvePoints:[[],[]],activeCurveIndex:0,axisConfig:{xVal1:100,xVal2:.001,yVal1:0,yVal2:100,xLog:!0}},dom:{},instructions:["画像をアップロードしてください","X軸の1点目をクリックしてください (例: 100mm)","X軸の2点目をクリックしてください (例: 0.001mm)","Y軸の1点目をクリックしてください (例: 0%)","Y軸の2点目をクリックしてください (例: 100%)","抽出する曲線を選択し、点をクリックしてください"],axisLabels:["","X軸 点1の値 (mm)","X軸 点2の値 (mm)","Y軸 点1の値 (%)","Y軸 点2の値 (%)"],curveColors:["#3b82f6","#10b981"],init(){this.dom.modal=document.getElementById("imageExtractorModal"),this.dom.canvas=document.getElementById("extractorCanvas"),this.dom.ctx=this.dom.canvas.getContext("2d"),document.getElementById("extractorImageInput").addEventListener("change",this.handleImageUpload.bind(this)),document.getElementById("extractorResetBtn").addEventListener("click",this.reset.bind(this)),document.getElementById("extractorClearPointsBtn").addEventListener("click",this.clearPoints.bind(this)),document.getElementById("extractorAxisInput").addEventListener("input",this.handleAxisInput.bind(this)),document.getElementById("applyExtractedDataBtn").addEventListener("click",this.applyData.bind(this)),document.getElementById("exportExtractedCSVBtn").addEventListener("click",this.exportExtractedCSV.bind(this)),this.dom.canvas.addEventListener("click",this.handleCanvasClick.bind(this))},open(a,t){this.state.targetGroupIndex=a,this.state.targetStandardIndex=t,this.dom.modal.style.display="flex";const e=standardGroups[a].standards[t];e.extractorState?this.loadState(e.extractorState):this.reset(!1)},close(){this.dom.modal.style.display="none"},loadState(a){const t=new Image;t.onload=()=>{this.state.image=t,this.state.calibrationPoints=a.calibrationPoints,this.state.curvePoints=a.curvePoints,this.state.axisConfig=a.axisConfig,this.state.step=5,document.getElementById("extractorUploadArea").classList.add("hidden"),document.getElementById("extractorMainArea").classList.remove("hidden"),document.getElementById("extractorAxisInputArea").classList.add("hidden"),document.getElementById("extractorExtractArea").classList.remove("hidden"),this.updateInstruction(),this.switchCurve(0),this.updateActionButtons(),this.drawCanvas()},t.src=a.imageSrc},zoom(a){const t=this.dom.canvas,e=t.clientWidth*a;t.style.width=`${e}px`,t.style.height="auto"},handleImageUpload(a){const t=a.target.files[0];if(!t)return;const e=new FileReader;e.onload=a=>{const t=new Image;t.onload=()=>{this.state.image=t,this.dom.canvas.style.width="auto",this.dom.canvas.style.height="auto",this.reset(!0,!1)},t.src=a.target.result},e.readAsDataURL(t),a.target.value=""},handleCanvasClick(a){if(!this.state.image)return;const t=this.dom.canvas,e=t.getBoundingClientRect(),o=t.width/e.width,s=t.height/e.height,l=(a.clientX-e.left)*o,n=(a.clientY-e.top)*s;this.state.step>=1&&this.state.step<=4?(this.state.calibrationPoints.push({x:l,y:n}),this.state.step++,5===this.state.step&&(document.getElementById("extractorAxisInputArea").classList.add("hidden"),document.getElementById("extractorExtractArea").classList.remove("hidden"),this.switchCurve(0)),this.updateInstruction()):5===this.state.step&&(this.state.curvePoints[this.state.activeCurveIndex].push({x:l,y:n}),this.updateActionButtons()),this.drawCanvas()},handleAxisInput(a){const t=parseFloat(a.target.value);if(isNaN(t))return;const e=this.state.step;1===e?this.state.axisConfig.xVal1=t:2===e?this.state.axisConfig.xVal2=t:3===e?this.state.axisConfig.yVal1=t:4===e&&(this.state.axisConfig.yVal2=t)},switchCurve(a){this.state.activeCurveIndex=a,document.getElementById("upperCurveBtn").classList.toggle("active",0===a),document.getElementById("lowerCurveBtn").classList.toggle("active",1===a)},updateInstruction(){document.getElementById("extractorInstruction").textContent=`ステップ ${this.state.step}: ${this.instructions[this.state.step]}`;const a=document.getElementById("extractorAxisInput"),t=document.getElementById("extractorAxisLabel");this.state.step>=1&&this.state.step<=4&&(t.textContent=this.axisLabels[this.state.step],1===this.state.step?a.value=this.state.axisConfig.xVal1:2===this.state.step?a.value=this.state.axisConfig.xVal2:3===this.state.step?a.value=this.state.axisConfig.yVal1:4===this.state.step&&(a.value=this.state.axisConfig.yVal2))},drawCanvas(){if(!this.state.image)return;const a=this.dom.canvas,t=this.dom.ctx;a.width=this.state.image.width,a.height=this.state.image.height,t.drawImage(this.state.image,0,0),this.state.calibrationPoints.forEach((a,e)=>{t.fillStyle="red",t.strokeStyle="white",t.lineWidth=2,t.beginPath(),t.arc(a.x,a.y,8,0,2*Math.PI),t.fill(),t.stroke(),t.fillStyle="white",t.font="bold 16px sans-serif",t.textAlign="center",t.textBaseline="middle",t.fillText(e+1,a.x,a.y)}),this.state.curvePoints.forEach((a,e)=>{const o=this.curveColors[e];a.forEach(a=>{t.fillStyle=o,t.strokeStyle="white",t.lineWidth=2,t.beginPath(),t.arc(a.x,a.y,5,0,2*Math.PI),t.fill(),t.stroke()}),a.length>1&&(t.strokeStyle=o,t.lineWidth=2,t.beginPath(),[...a].sort((a,t)=>a.x-t.x).forEach((a,e)=>0==e?t.moveTo(a.x,a.y):t.lineTo(a.x,a.y)),t.stroke())})},reset(a=!0,t=!0){t&&(this.state.image=null,this.dom.canvas.style.width="auto",this.dom.canvas.style.height="auto"),this.state.step=this.state.image?1:0,this.resetState(),document.getElementById("extractorMainArea").classList.toggle("hidden",!this.state.image),document.getElementById("extractorUploadArea").classList.toggle("hidden",!!this.state.image),document.getElementById("extractorAxisInputArea").classList.toggle("hidden",!this.state.image||this.state.step>=5),document.getElementById("extractorExtractArea").classList.add("hidden"),this.state.image||this.dom.ctx.clearRect(0,0,this.dom.canvas.width,this.dom.canvas.height),this.updateInstruction(),this.updateActionButtons(),this.drawCanvas()},resetState(){Object.assign(this.state,{calibrationPoints:[],curvePoints:[[],[]],activeCurveIndex:0})},clearPoints(){this.state.step<5||(this.state.curvePoints[this.state.activeCurveIndex]=[],this.updateActionButtons(),this.drawCanvas())},updateActionButtons(){const a=this.state.curvePoints.some(a=>a.length>0);document.getElementById("applyExtractedDataBtn").disabled=!a,document.getElementById("exportExtractedCSVBtn").disabled=!a},pixelToValue(a,t){if(this.state.calibrationPoints.length<4)return null;const[e,o,s,l]=this.state.calibrationPoints,{xVal1:n,xVal2:i,yVal1:d,yVal2:r,xLog:c}=this.state.axisConfig,h=(a-e.x)/(o.x-e.x),p=c?Math.pow(10,Math.log10(n)+h*(Math.log10(i)-Math.log10(n))):n+h*(i-n),u=(t-s.y)/(l.y-s.y);return{x:p,y:d+u*(r-d)}},processAndSortPoints(a){return a.map(a=>this.pixelToValue(a.x,a.y)).filter(Boolean).map(a=>({grainSize:parseFloat(a.x.toPrecision(3)),passingPercent:Math.max(0,Math.min(100,a.y)).toFixed(2)}))},
+applyData(){const{targetGroupIndex:a,targetStandardIndex:t,curvePoints:e}=this.state;if(null==a||null==t||e.every(a=>0===a.length))return;const o=this.processAndSortPoints(e[0]),s=this.processAndSortPoints(e[1]),l="# 上限\n"+o.sort((a,t)=>a.grainSize-t.grainSize).map(a=>`${a.grainSize}\t${a.passingPercent}`).join("\n"),n="# 下限\n"+s.sort((a,t)=>a.grainSize-t.grainSize).map(a=>`${a.grainSize}\t${a.passingPercent}`).join("\n"),c=document.getElementById("extractorCombineFill").checked,i=o.length>0,d=s.length>0,r=standardGroups[a],g=r.standards[t];if(c){g.dataStr=i&&d?`${l}\n---\n${n}`:i?l:n.replace("# 下限\n","# データ\n"),g.fill=i&&d,g.extractorState=this.getExtractorState(),alert("データを塗りつぶし範囲として反映しました。")}else{let e=!1;if(i){g.dataStr=l,g.fill=!1,g.name=g.name.replace(" (下限)","")+" (上限)",g.extractorState=this.getExtractorState(),e=!0}if(d){const t={id:Date.now()+Math.random(),name:g.name.replace(" (上限)","")+" (下限)",comment:g.comment,visible:!0,fill:!1,color:"#"+("000000"+(16777215-parseInt(g.color.substring(1),16)).toString(16)).slice(-6),opacity:.8,dataStr:n,extractorState:this.getExtractorState()};i?(r.standards.splice(a+1,0,t),alert("上限と下限を2つの独立した線として追加・更新しました。")):Object.assign(g,t)}else e||alert("データを1つの線として反映しました。")}saveStandardsToLocalStorage(),renderReferenceStandardsTable(a),renderAllCharts(),this.close()},getExtractorState(){return{imageSrc:this.state.image.src,calibrationPoints:this.state.calibrationPoints,curvePoints:this.state.curvePoints,axisConfig:this.state.axisConfig}},
+exportExtractedCSV(){const a=this.processAndSortPoints(this.state.curvePoints[0]).sort((a,t)=>t.grainSize-a.grainSize),t=this.processAndSortPoints(this.state.curvePoints[1]).sort((a,t)=>t.grainSize-a.grainSize);if(0===a.length&&0===t.length)return alert("エクスポートするデータがありません。");let e="curve_type,grain_size_mm,passing_percent_%\n";a.forEach(a=>{e+=`upper,${a.grainSize},${a.passingPercent}\n`}),t.forEach(a=>{e+=`lower,${a.grainSize},${a.passingPercent}\n`});const o=new Blob(["\ufeff"+e],{type:"text/csv;charset=utf-8;"}),s=document.createElement("a");s.href=URL.createObjectURL(o),s.download="extracted_grain_size_data.csv",s.click(),URL.revokeObjectURL(s.href)}};
+
+let processedDataForImport = [];
+let listHot, resultsHot;
+
+function openDataProcessorModal() {
+    document.getElementById('dataProcessorModal').style.display = 'flex';
+    // Handsontableの初期化・描画ズレ防止
+    setTimeout(() => {
+        initializeHandsontables();
+        backToInput();
+        if(listHot) listHot.render();
+        if(resultsHot) resultsHot.render();
+    }, 100);
+}
+
+function closeDataProcessorModal() {
+    document.getElementById('dataProcessorModal').style.display = 'none';
+}
+
+function backToInput() {
+    document.getElementById('processorInputArea').style.display = 'flex';
+    document.getElementById('processorPreviewArea').style.display = 'none';
+}
+
+function initializeHandsontables() {
+    const listContainer = document.getElementById('listTableContainer');
+    const resultsContainer = document.getElementById('resultsTableContainer');
+    
+    // 既存インスタンスがあれば破棄
+    if (listHot) { listHot.destroy(); listHot = null; }
+    if (resultsHot) { resultsHot.destroy(); resultsHot = null; }
+
+    const commonSettings = {
+        startRows: 20,
+        startCols: 10,
+        rowHeaders: true,
+        colHeaders: true,
+        height: '100%',
+        width: '100%',
+        contextMenu: [
+            { key: 'row_above', name: '上に行を挿入' },
+            { key: 'row_below', name: '下に行を挿入' },
+            { key: 'remove_row', name: '行を削除' },
+            { name: '---------' },
+            { key: 'undo', name: '元に戻す' },
+            { key: 'redo', name: 'やり直し' }
+        ],
+        manualRowMove: true,
+        manualColumnMove: true,
+        manualRowResize: true,
+        manualColumnResize: true,
+        copyPaste: { pasteMode: 'shift_down' },
+        minSpareRows: 1,
+    };
+
+    listHot = new Handsontable(listContainer, {
+        ...commonSettings,
+        colHeaders: ['地点名', '試料名', '深度(m)', '土質名', '土層'],
+        columns: [{}, {}, {}, {}, {}],
+        startCols: 5,
+    });
+
+    resultsHot = new Handsontable(resultsContainer, {
+        ...commonSettings,
+        colHeaders: (index) => (index % 2 === 0) ? '粒径 (mm)' : '通過率 (%)',
+        startCols: 10,
+    });
+}
+function processPastedData() {
+    const listData = listHot.getData();
+    const resultsDataRaw = resultsHot.getSourceData();
+    if (listData.length === 0) { return alert('「1. 試験一覧表データ」が入力されていません。'); }
+    if (resultsDataRaw.filter(row => row.some(cell => cell !== null && cell !== '')).length === 0) { return alert('「2. 粒度試験結果データ」が入力されていません。'); }
+    try {
+        const sampleList = parseListTable(listData);
+        if(sampleList.length === 0) { return alert('有効な試験一覧表データがありません。「試料名」が入力されているか確認してください。'); }
+        const resultsData = parseResultsTable(resultsDataRaw, sampleList.length);
+        const combinedData = [];
+        sampleList.forEach((meta, i) => {
+            const points = resultsData[i];
+            const validPoints = points.filter(p => p.y !== '' && !isNaN(p.y));
+            if (validPoints.length > 0) {
+                const dataStr = validPoints.map(p => `${p.x}\t${p.y}`).join('\n');
+                combinedData.push({ ...meta, dataStr, pointsCount: validPoints.length });
+            }
+        });
+        if (combinedData.length === 0) { return alert('有効なデータを検出できませんでした。入力されたデータの形式を確認してください。'); }
+        generatePreview(combinedData);
+        processedDataForImport = combinedData;
+        document.getElementById('processorInputArea').style.display = 'none';
+        document.getElementById('processorPreviewArea').style.display = 'flex';
+    } catch (e) { console.error("データ解析エラー:", e); alert(`データの解析中にエラーが発生しました。\n\nエラー内容: ${e.message}`); }
+}
+
+function parseListTable(data) {
+    const sampleList = [];
+    data.forEach(row => {
+        const name = row[1] ? String(row[1]).trim() : null;
+        if (name) {
+            sampleList.push({ location: String(row[0] || '').trim(), name: name, depth: String(row[2] || '').trim(), soilType: String(row[3] || '').trim(), layer: String(row[4] || '1').trim() });
+        }
+    });
+    return sampleList;
+}
+
+function parseResultsTable(data, numberOfSamples) {
+    const results = Array.from({ length: numberOfSamples }, () => []);
+    if (numberOfSamples === 0) { throw new Error("試験一覧表に処理対象の試料データがありません。"); }
+    data.forEach(row => {
+        if (!row.some(cell => cell !== null && cell !== '')) return;
+        for (let i = 0; i < numberOfSamples; i++) {
+            const sizeColIndex = i * 2; const passColIndex = sizeColIndex + 1;
+            if (row.length > sizeColIndex) {
+                const sizeStr = String(row[sizeColIndex] || '').trim();
+                if (sizeStr) {
+                    const size = parseFloat(sizeStr);
+                    if (!isNaN(size)) {
+                        const percentStr = (row.length > passColIndex) ? String(row[passColIndex] || '').trim() : '';
+                        const percent = parseFloat(percentStr);
+                        results[i].push({ x: size, y: !isNaN(percent) ? percent : '' });
+                    }
+                }
+            }
+        }
+    });
+    return results;
+}
+
+function generatePreview(data) {
+    const table = document.getElementById('processorPreviewTable');
+    let html = `<thead><tr><th>地点名</th><th>試料名</th><th>深度(m)</th><th>土質名</th><th>土層</th><th>データ点数</th></tr></thead><tbody>`;
+    data.forEach(d => { html += `<tr><td>${d.location}</td><td>${d.name}</td><td>${d.depth}</td><td>${d.soilType}</td><td>${d.layer}</td><td>${d.pointsCount}</td></tr>`; });
+    html += '</tbody>';
+    table.innerHTML = html;
+}
+
+function confirmImport() {
+    if (processedDataForImport.length === 0) { return alert('読み込むデータがありません。'); }
+    let addedCount = 0, updatedCount = 0;
+    processedDataForImport.forEach(d => {
+        const existingIndex = samples.findIndex(s => s.location === d.location && s.name === d.name && s.layer === d.layer);
+        if (existingIndex !== -1) { Object.assign(samples[existingIndex], { depth: d.depth, soilType: d.soilType, dataStr: d.dataStr }); updatedCount++; } 
+        else { samples.push({ id: Date.now() + Math.random(), ...d }); addedCount++; }
+    });
+    alert(`${addedCount}件のデータを新規追加し、${updatedCount}件のデータを更新しました。`);
+    closeDataProcessorModal();
+    renderTable(); renderAllCharts();
+}
+
+function openLayerOrderModal() {
+    const modal = document.getElementById('layerOrderModal');
+    const list = document.getElementById('layerOrderList');
+    let soilTypes = [...new Set(samples.map(s => s.soilType || '（土質名なし）'))];
+    soilTypes.sort((a, b) => String(a).localeCompare(String(b), undefined, { numeric: true }));
+    list.innerHTML = '';
+    if (soilTypes.length === 0) { list.innerHTML = '<p class="help-text" style="text-align:center;">番号を割り当てる土質名がありません。</p>'; } 
+    else {
+        soilTypes.forEach(soilTypeName => {
+            const li = document.createElement('li');
+            li.textContent = soilTypeName; li.draggable = true; li.dataset.soilType = soilTypeName;
+            list.appendChild(li);
+        });
+    }
+    modal.style.display = 'flex';
+}
+
+function closeLayerOrderModal() { document.getElementById('layerOrderModal').style.display = 'none'; }
+
+function saveLayerOrder() {
+    if (!confirm('「土質名」の順序に基づいて、データ一覧表の「土層」列を番号(1, 2, 3...)で上書きします。よろしいですか？')) { return; }
+    const list = document.getElementById('layerOrderList');
+    const newOrderOfSoilTypes = [...list.querySelectorAll('li')].map(li => li.dataset.soilType);
+    const soilTypeMap = new Map(newOrderOfSoilTypes.map((soilTypeName, index) => [soilTypeName, index + 1]));
+    samples.forEach(sample => {
+        const originalSoilType = sample.soilType || '（土質名なし）';
+        if (soilTypeMap.has(originalSoilType)) { sample.layer = soilTypeMap.get(originalSoilType).toString(); }
+    });
+    alert('「土層」列の番号を更新しました。');
+    closeLayerOrderModal();
+    renderTable(); renderAllCharts();
+}
+
+function setupLayerOrderModalDragAndDrop() {
+    const list = document.getElementById('layerOrderList');
+    let draggedItem = null;
+    list.addEventListener('dragstart', (e) => { draggedItem = e.target; setTimeout(() => e.target.classList.add('dragging'), 0); });
+    list.addEventListener('dragend', (e) => { e.target.classList.remove('dragging'); });
+    list.addEventListener('dragover', (e) => {
+        e.preventDefault();
+        const afterElement = getDragAfterElement(list, e.clientY);
+        list.insertBefore(draggedItem, afterElement);
+    });
+}
+
+function getDragAfterElement(container, y) {
+    const draggableElements = [...container.querySelectorAll('li:not(.dragging)')];
+    return draggableElements.reduce((closest, child) => {
+        const box = child.getBoundingClientRect();
+        const offset = y - box.top - box.height / 2;
+        return (offset < 0 && offset > closest.offset) ? { offset, element: child } : closest;
+    }, { offset: Number.NEGATIVE_INFINITY }).element;
+}
+
+function saveAppState() {
+    if (samples.length === 0 && standardGroups.length === 0) { return alert('保存するデータがありません。'); }
+    const appState = { samples, standardGroups, customLayerOrder };
+    const blob = new Blob([JSON.stringify(appState, null, 2)], { type: 'application/json' });
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = 'ryudo-app-session.json';
+    a.click();
+    URL.revokeObjectURL(a.href);
+}
+
+function handleAppStateImport(event) {
+    handleFileRead(event.target.files[0], (text) => {
+        try {
+            const loadedState = JSON.parse(text);
+            if (!loadedState.samples || !loadedState.standardGroups) { throw new Error('無効なファイル形式です。'); }
+            if (!confirm('現在の作業内容が破棄され、ファイルの内容に置き換わります。よろしいですか？')) { return; }
+            samples = loadedState.samples || [];
+            standardGroups = loadedState.standardGroups || [];
+            customLayerOrder = loadedState.customLayerOrder || [];
+            renderTable();
+            saveStandardsToLocalStorage();
+            populateStandardGroupSelector();
+            renderReferenceStandardsTable();
+            renderAllCharts();
+            alert('状態を正常に読み込みました。');
+        } catch (e) { console.error(e); alert('ファイルの読み込みに失敗しました。ファイルが破損しているか、形式が正しくありません。'); }
+    });
+    event.target.value = '';
+}
+</script>
+</body>
+</html>
