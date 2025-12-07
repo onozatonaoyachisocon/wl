@@ -1,0 +1,1633 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>台形盛土の土中応力計算</title>
+<link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>📉</text></svg>">
+<!-- React & ReactDOM -->
+<script crossorigin src="https://cdnjs.cloudflare.com/ajax/libs/react/18.2.0/umd/react.production.min.js"></script>
+<script crossorigin src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.2.0/umd/react-dom.production.min.js"></script>
+
+<!-- Prop-types -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/prop-types/15.8.1/prop-types.min.js"></script>
+
+<!-- Recharts -->
+<script src="https://cdn.jsdelivr.net/npm/recharts@2.12.0/umd/Recharts.min.js"></script>
+
+<!-- Babel -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/babel-standalone/7.23.5/babel.min.js"></script>
+
+<!-- Tailwind CSS -->
+<script src="https://cdn.tailwindcss.com"></script>
+
+<!-- Handsontable v6.2.2 -->
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/handsontable@6.2.2/dist/handsontable.full.min.css">
+<script src="https://cdn.jsdelivr.net/npm/handsontable@6.2.2/dist/handsontable.full.min.js"></script>
+
+<!-- Icons (Lucide) -->
+<script src="https://unpkg.com/lucide@latest"></script>
+
+<style>
+    body { font-family: "Helvetica Neue", Arial, sans-serif; background-color: #f8fafc; overflow: hidden; }
+    
+    .dark-slider {
+        -webkit-appearance: none;
+        height: 6px;
+        background: #475569;
+        border-radius: 5px;
+        outline: none;
+        cursor: pointer;
+    }
+    .dark-slider::-webkit-slider-thumb {
+        -webkit-appearance: none;
+        width: 14px;
+        height: 14px;
+        border-radius: 50%;
+        background: #60a5fa;
+        cursor: pointer;
+        border: 2px solid #1e293b;
+        margin-top: -4px;
+    }
+    .dark-slider::-webkit-slider-runnable-track {
+        width: 100%;
+        height: 6px;
+        cursor: pointer;
+        background: #475569;
+        border-radius: 5px;
+    }
+
+    /* Light Theme Slider for Modal */
+    .light-slider {
+        -webkit-appearance: none;
+        height: 6px;
+        background: #cbd5e1;
+        border-radius: 5px;
+        outline: none;
+        cursor: pointer;
+    }
+    .light-slider::-webkit-slider-thumb {
+        -webkit-appearance: none;
+        width: 16px;
+        height: 16px;
+        border-radius: 50%;
+        background: #2563eb;
+        cursor: pointer;
+        border: 2px solid #fff;
+        box-shadow: 0 1px 3px rgba(0,0,0,0.3);
+        margin-top: -5px;
+    }
+
+    .handsontable {
+        font-family: 'Arial', sans-serif;
+        font-size: 12px;
+        color: #333;
+    }
+
+    ::-webkit-scrollbar { width: 8px; height: 8px; }
+    ::-webkit-scrollbar-track { background: #1e293b; }
+    ::-webkit-scrollbar-thumb { background: #475569; border-radius: 4px; }
+    ::-webkit-scrollbar-thumb:hover { background: #64748b; }
+    
+    .light-scroll ::-webkit-scrollbar-track { background: #f1f5f9; }
+    .light-scroll ::-webkit-scrollbar-thumb { background: #cbd5e1; }
+
+    input[type=number]::-webkit-inner-spin-button, 
+    input[type=number]::-webkit-outer-spin-button {  
+        opacity: 1;
+    }
+
+    .modal-overlay { animation: fadeIn 0.2s ease-out; }
+    .modal-content { animation: scaleIn 0.2s ease-out; }
+    
+    @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+    @keyframes scaleIn { from { transform: scale(0.95); opacity: 0; } to { transform: scale(1); opacity: 1; } }
+
+    .recharts-surface {
+        overflow: visible; 
+    }
+    
+    .clickable-dot {
+        cursor: pointer;
+        pointer-events: all !important; 
+        transition: r 0.2s, opacity 0.2s;
+    }
+    .clickable-dot:hover {
+        opacity: 0.8;
+    }
+
+    .draggable-popup {
+        cursor: grab;
+    }
+    .draggable-popup:active {
+        cursor: grabbing;
+    }
+    
+    .recharts-tooltip-cursor {
+        pointer-events: none;
+    }
+
+    /* Tab Styles */
+    .tab-active {
+        border-bottom: 3px solid #2563eb;
+        color: #1e3a8a;
+        font-weight: bold;
+        background-color: #eff6ff;
+    }
+    .tab-inactive {
+        color: #64748b;
+        border-bottom: 3px solid transparent;
+    }
+    .tab-inactive:hover {
+        color: #334155;
+        background-color: #f8fafc;
+    }
+</style>
+</head>
+<body>
+<div id="root"></div>
+
+<script type="text/babel">
+    const { useState, useEffect, useMemo, useCallback, useRef } = React;
+    const { 
+        ComposedChart, Line, Area, ScatterChart, Scatter, Cell, XAxis, YAxis, ZAxis, 
+        CartesianGrid, Tooltip, Legend, ResponsiveContainer, 
+        ReferenceLine, ReferenceArea, LabelList, Label 
+    } = window.Recharts;
+
+    const VISUAL_CONFIG = {
+        gridStroke: "#94a3b8",
+        axisStroke: "#334155",
+        axisWidth: 2
+    };
+
+    // ==========================================
+    //  計算ロジック
+    // ==========================================
+    const calculateOsterbergI = (a, b, z) => {
+        const effZ = Math.max(z, 0.01);
+        if (Math.abs(a) < 0.0001) return (1 / Math.PI) * Math.atan(b / effZ);
+        const term1 = ((a + b) / a) * Math.atan((a + b) / effZ);
+        const term2 = (b / a) * Math.atan(b / effZ);
+        return (1 / Math.PI) * (term1 - term2);
+    };
+
+    const calculateSideContribution = (gap, s_up, flat, s_down, z) => {
+        const I_big = calculateOsterbergI(s_down, gap + s_up + flat, z);
+        const I_small = calculateOsterbergI(s_up, gap, z);
+        return I_big - I_small;
+    };
+
+    const calculateExactStress = (x, topWidth, bottomWidth, q, z) => {
+        const safeBottom = Math.max(bottomWidth, topWidth);
+        const slopeWidth = (safeBottom - topWidth) / 2;
+        const W_top = topWidth;
+        const W_sl = slopeWidth; 
+        const W_sr = slopeWidth;
+        const X_ls = -W_top / 2;
+        const X_lt = X_ls - W_sl;
+        const X_rs = W_top / 2;
+        const X_rt = X_rs + W_sr;
+
+        let I_total = 0;
+        {
+            let gap = 0, s_up = 0, flat = 0, s_down = 0;
+            if (x >= X_rt) { I_total += 0; }
+            else if (x >= X_rs) { s_down = X_rt - x; I_total += calculateSideContribution(0, 0, 0, s_down, z); }
+            else if (x >= X_ls) { flat = X_rs - x; s_down = W_sr; I_total += calculateSideContribution(0, 0, flat, s_down, z); }
+            else if (x >= X_lt) { s_up = X_ls - x; flat = W_top; s_down = W_sr; I_total += calculateSideContribution(0, s_up, flat, s_down, z); }
+            else { gap = X_lt - x; s_up = W_sl; flat = W_top; s_down = W_sr; I_total += calculateSideContribution(gap, s_up, flat, s_down, z); }
+        }
+        {
+            let gap = 0, s_up = 0, flat = 0, s_down = 0;
+            if (x <= X_lt) { I_total += 0; }
+            else if (x <= X_ls) { s_down = x - X_lt; I_total += calculateSideContribution(0, 0, 0, s_down, z); }
+            else if (x <= X_rs) { flat = x - X_ls; s_down = W_sl; I_total += calculateSideContribution(0, 0, flat, s_down, z); }
+            else if (x <= X_rt) { s_up = x - X_rs; flat = W_top; s_down = W_sl; I_total += calculateSideContribution(0, s_up, flat, s_down, z); }
+            else { gap = x - X_rt; s_up = W_sr; flat = W_top; s_down = W_sl; I_total += calculateSideContribution(gap, s_up, flat, s_down, z); }
+        }
+        return I_total * q;
+    };
+
+    const calculateGeostaticStress = (z, layers, gwl) => {
+        let totalStress = 0;
+        let currentDepth = 0;
+        const GAMMA_W = 9.8;
+
+        for (let i = 0; i < layers.length; i++) {
+            const layer = layers[i];
+            const thickness = layer.depth - currentDepth;
+            
+            if (z <= layer.depth) {
+                totalStress += layer.gamma * (z - currentDepth);
+                break;
+            } else {
+                totalStress += layer.gamma * thickness;
+                currentDepth = layer.depth;
+            }
+            if (i === layers.length - 1 && z > layer.depth) {
+                totalStress += layer.gamma * (z - layer.depth);
+            }
+        }
+        let porePressure = 0;
+        if (z > gwl) {
+            porePressure = (z - gwl) * GAMMA_W;
+        }
+        return Math.max(0, totalStress - porePressure);
+    };
+
+    // ==========================================
+    //  UI Components
+    // ==========================================
+
+    const HelpModal = ({ isOpen, onClose }) => {
+        if (!isOpen) return null;
+        return (
+            <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 modal-overlay" onClick={onClose}>
+                <div className="bg-white rounded-lg shadow-2xl w-[800px] max-h-[90vh] flex flex-col modal-content" onClick={e => e.stopPropagation()}>
+                    <div className="p-4 border-b border-slate-200 flex justify-between items-center bg-slate-50 rounded-t-lg">
+                        <h2 className="text-lg font-bold text-slate-700 flex items-center gap-2">
+                    <span>📖</span> ヘルプ & 計算ロジック
+                        </h2>
+                        <button onClick={onClose} className="text-slate-400 hover:text-slate-600 text-xl font-bold">&times;</button>
+                    </div>
+                    <div className="p-6 overflow-y-auto text-slate-700 space-y-6 leading-relaxed text-sm">
+                        
+                        <section>
+                            <h3 className="text-base font-bold text-blue-800 border-b border-blue-200 mb-2 pb-1">概要</h3>
+                            <p>
+                                本ツールは、地表面に台形盛土が構築された場合の地盤内応力（増加応力）を計算し、
+                                元の地盤有効応力や圧密試験結果（Pc）と比較表示するシステムです。
+                                また、Pcと有効上載圧(P0)の関係から、過圧密量や過圧密比(OCR)を自動算出してグラフ化します。
+                            </p>
+                        </section>
+
+                        <section>
+                            <h3 className="text-base font-bold text-blue-800 border-b border-blue-200 mb-2 pb-1">計算ロジック（理論的背景）</h3>
+                            <div className="bg-slate-50 p-4 rounded border border-slate-200">
+                                <p className="mb-2">
+                                    本システムの増加応力計算は、<strong>ブシネスク(Boussinesq)の弾性解</strong>に基づいた
+                                    <strong>オスターバーグ(Osterberg)の図表</strong>の数式を使用しています。<br/>
+                                </p>
+                                <div className="my-3 p-3 bg-white border border-slate-300 rounded text-center">
+                                    <p className="font-serif text-sm italic mb-1">Osterberg Influence Factor Formula:</p>
+                                    <img src="https://latex.codecogs.com/svg.image?I=\frac{1}{\pi}\left[\frac{a+b}{a}\arctan\left(\frac{a+b}{z}\right)-\frac{b}{a}\arctan\left(\frac{b}{z}\right)\right]" alt="Osterberg Formula" />
+                                </div>
+                                <ul className="list-disc pl-5 space-y-1 text-xs text-slate-600">
+                                    <li><strong>z</strong>: 計算深度</li>
+                                    <li><strong>a</strong>: 盛土法面の水平投影長</li>
+                                    <li><strong>b</strong>: 盛土上端から計算点までの水平距離</li>
+                                </ul>
+                                <p className="mt-2 text-xs">
+                                    ※ 実際の台形盛土に対しては、<strong>重ね合わせの原理（Superposition）</strong>を用いて、
+                                    形状を複数の三角形要素に分解・合算して計算しています。
+                                </p>
+                            </div>
+                        </section>
+
+                        <section>
+                            <h3 className="text-base font-bold text-blue-800 border-b border-blue-200 mb-2 pb-1">操作方法</h3>
+                            <div className="grid grid-cols-2 gap-4">
+                                <div>
+                                    <h4 className="font-bold text-slate-800 mb-1">1. データ入出力</h4>
+                                    <p className="text-xs mb-2">画面左上のパネルから、現在の設定（盛土・地層・Pcデータ等）をJSON形式で保存・読込が可能です。<br/>CSV保存では計算結果を出力します。</p>
+                                    
+                                    <h4 className="font-bold text-slate-800 mb-1">2. 盛土・地盤条件</h4>
+                                    <p className="text-xs mb-2">左サイドバーのスライダーや入力欄で、盛土の寸法や単位体積重量、地下水位を設定します。</p>
+                                </div>
+                                <div>
+                                    <h4 className="font-bold text-slate-800 mb-1">3. 地層・試験データ編集</h4>
+                                    <p className="text-xs mb-2">中央の表計算パネルで地層構成と圧密試験データ(Pc)を編集し、「更新」ボタンを押すとグラフに反映されます。</p>
+
+                                    <h4 className="font-bold text-slate-800 mb-1">4. グラフ操作</h4>
+                                    <p className="text-xs">
+                                        右側のグラフパネルにあるスライダーで、表示範囲を調整できます。<br/>
+                                        <strong>Pcの点（緑色）をクリック</strong>すると、詳細情報（P0, ΔP, Pc値など）が吹き出しで固定表示されます。
+                                    </p>
+                                </div>
+                            </div>
+                        </section>
+
+                        <section>
+                            <h3 className="text-base font-bold text-blue-800 border-b border-blue-200 mb-2 pb-1">過圧密分析について</h3>
+                            <div className="grid grid-cols-2 gap-4">
+                                <div>
+                                    <h4 className="font-bold text-slate-800 mb-1">過圧密量 (Pc - P0)</h4>
+                                    <p className="text-xs text-slate-600">
+                                        圧密降伏応力(Pc)と現在の有効上載圧(P0)の差を表します。<br/>
+                                        値が大きいほど、地盤は現在の荷重に対して余裕（過圧密状態）があります。
+                                    </p>
+                                </div>
+                                <div>
+                                    <h4 className="font-bold text-slate-800 mb-1">過圧密比 OCR (Pc / P0)</h4>
+                                    <p className="text-xs text-slate-600">
+                                        PcとP0の比率です。OCR > 1.0 で過圧密、OCR ≒ 1.0 で正規圧密と判断されます。<br/>
+                                        ※本ツールでは P0=0 の場合、便宜上 OCR=0 としています。
+                                    </p>
+                                </div>
+                            </div>
+                        </section>
+
+                        <div className="bg-yellow-50 border border-yellow-200 p-3 rounded text-xs text-yellow-800">
+                            <strong>免責事項:</strong> 本ツールの計算結果は簡易的な検討用です。設計実務においては、必ず専門技術者による検証を行ってください。
+                        </div>
+                    </div>
+                    <div className="p-4 border-t border-slate-200 bg-slate-50 flex justify-end rounded-b-lg">
+                        <button onClick={onClose} className="px-4 py-2 bg-slate-600 text-white rounded hover:bg-slate-700 transition">閉じる</button>
+                    </div>
+                </div>
+            </div>
+        );
+    };
+
+    // ==========================================
+    //  修正版: グラフ設定モーダル (リアルタイム反映 & キャンセルで復元)
+    // ==========================================
+    const GraphSettingsModal = ({ isOpen, onClose, config, setConfig }) => {
+        if (!isOpen) return null;
+        
+        // モーダルを開いた時点の設定を保持（キャンセル時に戻すため）
+        const [initialConfig, setInitialConfig] = useState(null);
+        
+        // モーダルが開いたタイミングでsnapshotを取得
+        useEffect(() => {
+            if (isOpen) {
+                setInitialConfig({ ...config });
+            }
+        }, [isOpen]);
+
+        const [activeTab, setActiveTab] = useState('stress');
+        const [position, setPosition] = useState({ x: 0, y: 0 });
+        const dragRef = useRef({ isDragging: false, startX: 0, startY: 0, initialX: 0, initialY: 0 });
+
+        const handleMouseDown = (e) => {
+            if (e.button !== 0) return;
+            e.preventDefault(); 
+            dragRef.current = {
+                isDragging: true,
+                startX: e.clientX,
+                startY: e.clientY,
+                initialX: position.x,
+                initialY: position.y
+            };
+            document.addEventListener('mousemove', handleMouseMove);
+            document.addEventListener('mouseup', handleMouseUp);
+        };
+
+        const handleMouseMove = useCallback((e) => {
+            if (!dragRef.current.isDragging) return;
+            const dx = e.clientX - dragRef.current.startX;
+            const dy = e.clientY - dragRef.current.startY;
+            setPosition({
+                x: dragRef.current.initialX + dx,
+                y: dragRef.current.initialY + dy
+            });
+        }, []);
+
+        const handleMouseUp = useCallback(() => {
+            dragRef.current.isDragging = false;
+            document.removeEventListener('mousemove', handleMouseMove);
+            document.removeEventListener('mouseup', handleMouseUp);
+        }, [handleMouseMove]);
+
+        // 設定変更ハンドラ：親のstateを直接書き換える（リアルタイムプレビュー）
+        const handleConfigChange = (key, value) => {
+            setConfig(prev => ({ ...prev, [key]: parseFloat(value) }));
+        };
+
+        const handleBoolChange = (key, value) => {
+            setConfig(prev => ({ ...prev, [key]: value }));
+        };
+
+        // 「キャンセル」または「×」：初期状態に戻して閉じる
+        const handleCancel = () => {
+            if (initialConfig) {
+                setConfig(initialConfig);
+            }
+            onClose();
+        };
+
+        // 「設定を完了」：そのまま閉じる（変更は既に適用されている）
+        const handleFinish = () => {
+            onClose();
+        };
+
+        return (
+            <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 modal-overlay" onClick={handleCancel}>
+                <div 
+                    className="bg-slate-100 rounded-lg shadow-2xl w-[550px] flex flex-col modal-content overflow-hidden border border-slate-300" 
+                    onClick={e => e.stopPropagation()}
+                    style={{ transform: `translate(${position.x}px, ${position.y}px)` }}
+                >
+                    <div 
+                        className="p-4 border-b border-slate-600 bg-slate-800 flex justify-between items-center rounded-t-lg cursor-move select-none"
+                        onMouseDown={handleMouseDown}
+                    >
+                        <h2 className="text-base font-bold text-white flex items-center gap-2 pointer-events-none">⚙️ グラフ表示設定</h2>
+                        <button 
+                            onClick={handleCancel} 
+                            onMouseDown={(e) => e.stopPropagation()}
+                            className="text-slate-300 hover:text-white font-bold px-2 text-xl cursor-pointer"
+                            title="変更を破棄して閉じる"
+                        >
+                            &times;
+                        </button>
+                    </div>
+
+                    <div className="px-6 py-4 bg-white border-b border-slate-200">
+                        <h3 className="text-xs font-bold text-slate-500 mb-3 uppercase tracking-wider">共通軸設定 (深度・縦軸)</h3>
+                        <div className="grid grid-cols-2 gap-6">
+                             <SliderInput label="表示深度 最大(m)" unit="m" min={5} max={100} step={1} value={config.yMax} onChange={v => handleConfigChange('yMax', v)} theme="light" />
+                             <SliderInput label="深度 目盛り間隔" unit="m" min={1} max={20} step={1} value={config.yStep} onChange={v => handleConfigChange('yStep', v)} theme="light" />
+                        </div>
+                    </div>
+
+                    <div className="flex border-b border-slate-300 bg-slate-50">
+                        <button onClick={() => setActiveTab('stress')} className={`flex-1 py-3 text-sm transition ${activeTab === 'stress' ? 'tab-active' : 'tab-inactive'}`}>① 応力図</button>
+                        <button onClick={() => setActiveTab('margin')} className={`flex-1 py-3 text-sm transition ${activeTab === 'margin' ? 'tab-active' : 'tab-inactive'}`}>② 過圧密量</button>
+                        <button onClick={() => setActiveTab('ocr')} className={`flex-1 py-3 text-sm transition ${activeTab === 'ocr' ? 'tab-active' : 'tab-inactive'}`}>③ OCR</button>
+                        <button onClick={() => setActiveTab('font')} className={`flex-1 py-3 text-sm transition ${activeTab === 'font' ? 'tab-active' : 'tab-inactive'}`}>🔤 フォント</button>
+                    </div>
+
+                    <div className="p-6 bg-white flex-1 overflow-y-auto max-h-[400px]">
+                        {activeTab === 'stress' && (
+                            <div className="space-y-5 animate-in fade-in zoom-in duration-200">
+                                <div className="border border-slate-200 rounded p-4 shadow-sm">
+                                    <h4 className="text-xs font-bold text-slate-500 mb-3">横軸設定</h4>
+                                    <div className="space-y-4">
+                                        <SliderInput label="表示応力 最大(kN/m²)" unit="kN/m²" min={50} max={1000} step={10} value={config.xMax} onChange={v => handleConfigChange('xMax', v)} theme="light" />
+                                        <SliderInput label="応力 目盛り間隔" unit="kN/m²" min={10} max={200} step={10} value={config.xStep} onChange={v => handleConfigChange('xStep', v)} theme="light" />
+                                    </div>
+                                </div>
+                                <div className="border border-slate-200 rounded p-4 shadow-sm bg-slate-50">
+                                    <h4 className="text-xs font-bold text-slate-500 mb-3">プロット設定</h4>
+                                    <div className="flex items-center justify-between">
+                                        <div className="flex items-center gap-2">
+                                            <input type="checkbox" id="showPcPlot" checked={config.showPcPlot} onChange={(e) => handleBoolChange('showPcPlot', e.target.checked)} className="w-4 h-4 text-blue-600 rounded focus:ring-blue-500 border-gray-300"/>
+                                            <label htmlFor="showPcPlot" className="text-sm font-bold text-slate-700 cursor-pointer">Pcプロットを表示</label>
+                                        </div>
+                                        <div className="flex items-center gap-2 w-1/2">
+                                            <span className="text-xs text-slate-500">点サイズ</span>
+                                            <input type="range" min="2" max="15" step="1" className="light-slider flex-1" value={config.markerSize} onChange={(e) => handleConfigChange('markerSize', e.target.value)} />
+                                            <span className="text-xs font-bold w-4 text-right">{config.markerSize}</span>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        )}
+                        {activeTab === 'margin' && (
+                            <div className="space-y-5 animate-in fade-in zoom-in duration-200">
+                                <div className="bg-blue-50 border-l-4 border-blue-500 p-2 mb-2 text-xs text-blue-700">横軸: Pc - P0 (過圧密量)</div>
+                                <div className="border border-slate-200 rounded p-4 shadow-sm">
+                                    <div className="grid grid-cols-2 gap-4 mb-4">
+                                        <SliderInput label="最小値 (Min)" unit="kN/m²" min={-500} max={0} step={10} value={config.marginMin} onChange={v => handleConfigChange('marginMin', v)} theme="light" />
+                                        <SliderInput label="最大値 (Max)" unit="kN/m²" min={10} max={1000} step={10} value={config.marginMax} onChange={v => handleConfigChange('marginMax', v)} theme="light" />
+                                    </div>
+                                    <SliderInput label="目盛り間隔" unit="kN/m²" min={10} max={200} step={10} value={config.marginStep} onChange={v => handleConfigChange('marginStep', v)} theme="light" />
+                                </div>
+                            </div>
+                        )}
+                        {activeTab === 'ocr' && (
+                            <div className="space-y-5 animate-in fade-in zoom-in duration-200">
+                                <div className="bg-purple-50 border-l-4 border-purple-500 p-2 mb-2 text-xs text-purple-700">横軸: OCR (Pc / P0)</div>
+                                <div className="border border-slate-200 rounded p-4 shadow-sm">
+                                    <SliderInput label="OCR 最大値" unit="" min={2} max={50} step={0.5} value={config.ocrMax} onChange={v => handleConfigChange('ocrMax', v)} theme="light" />
+                                    <div className="h-4"></div>
+                                    <SliderInput label="目盛り間隔" unit="" min={0.5} max={10} step={0.5} value={config.ocrStep} onChange={v => handleConfigChange('ocrStep', v)} theme="light" />
+                                </div>
+                            </div>
+                        )}
+                        {activeTab === 'font' && (
+                            <div className="space-y-5 animate-in fade-in zoom-in duration-200">
+                                <p className="text-xs text-slate-500 mb-2">※ 全てのグラフに適用されます</p>
+                                <div className="border border-slate-200 rounded p-4 shadow-sm space-y-4">
+                                    <SliderInput label="軸ラベル (Label)" unit="px" min={8} max={20} step={1} value={config.axisLabelSize} onChange={v => handleConfigChange('axisLabelSize', v)} theme="light" />
+                                    <SliderInput label="目盛り数値 (Tick)" unit="px" min={8} max={16} step={1} value={config.tickSize} onChange={v => handleConfigChange('tickSize', v)} theme="light" />
+                                    <SliderInput label="凡例 (Legend)" unit="px" min={8} max={16} step={1} value={config.legendSize} onChange={v => handleConfigChange('legendSize', v)} theme="light" />
+                                    <SliderInput label="ツールチップ" unit="px" min={10} max={18} step={1} value={config.tooltipSize} onChange={v => handleConfigChange('tooltipSize', v)} theme="light" />
+                                </div>
+                            </div>
+                        )}
+                    </div>
+                    
+                    <div className="p-4 bg-slate-100 border-t border-slate-300 flex justify-end gap-3 rounded-b-lg">
+                        <button onClick={handleCancel} className="px-4 py-2 bg-slate-200 text-slate-700 rounded font-bold hover:bg-slate-300 transition">キャンセル</button>
+                        <button onClick={handleFinish} className="px-6 py-2 bg-blue-600 text-white rounded font-bold shadow hover:bg-blue-700 hover:shadow-lg transition transform active:scale-95">設定を完了</button>
+                    </div>
+                </div>
+            </div>
+        );
+    };
+
+    // ==========================================
+    //  NEW: 計算過程詳細表示モーダル
+    // ==========================================
+    const CalculationDetailModal = ({ isOpen, onClose, embankment, calcX, calcZ }) => {
+        if (!isOpen) return null;
+
+        const { topWidth, bottomWidth, height, unitWeight } = embankment;
+        const q = height * unitWeight;
+        const x = calcX;
+        const z = calcZ;
+
+        // 計算ロジックを再現してログを生成する
+        const steps = useMemo(() => {
+            const logs = [];
+            
+            // 形状定義
+            const safeBottom = Math.max(bottomWidth, topWidth);
+            const slopeWidth = (safeBottom - topWidth) / 2;
+            const W_top = topWidth;
+            const W_sl = slopeWidth; 
+            const W_sr = slopeWidth;
+            
+            // 座標定義 (盛土中心を0とする)
+            const X_ls = -W_top / 2;       // 左肩
+            const X_lt = X_ls - W_sl;      // 左尻
+            const X_rs = W_top / 2;        // 右肩
+            const X_rt = X_rs + W_sr;      // 右尻
+
+            logs.push({ type: 'header', title: '1. 幾何形状と基本条件', content: [
+                { label: '盛土荷重 q', value: `${q.toFixed(2)} kN/m²` },
+                { label: '計算深度 z', value: `${z.toFixed(2)} m` },
+                { label: '計算位置 x', value: `${x.toFixed(2)} m (盛土中心からの距離)` },
+                { label: '左法尻位置', value: `${X_lt.toFixed(2)} m` },
+                { label: '左肩位置', value: `${X_ls.toFixed(2)} m` },
+                { label: '右肩位置', value: `${X_rs.toFixed(2)} m` },
+                { label: '右法尻位置', value: `${X_rt.toFixed(2)} m` }
+            ]});
+
+            // Osterberg係数計算のヘルパー（ログ付き）
+            const calcWithLog = (name, a, b, z_val, sign = 1) => {
+                const val = calculateOsterbergI(a, b, z_val);
+                return { name, a: a.toFixed(3), b: b.toFixed(3), z: z_val.toFixed(3), I: val.toFixed(6), sign, val: val * sign };
+            };
+
+            // 分割計算ロジック (calculateExactStressと同様の分岐)
+            let I_total = 0;
+            const stepLogs = [];
+
+            // 左側部分の寄与
+            {
+                let gap = 0, s_up = 0, flat = 0, s_down = 0;
+                let desc = "";
+                // 判定ロジック
+                if (x >= X_rt) { desc = "右法尻より右側 (影響なし)"; }
+                else if (x >= X_rs) { 
+                    desc = "右法面上 (右肩～右尻の間)"; 
+                    s_down = X_rt - x; 
+                    // calculateSideContribution(0, 0, 0, s_down, z);
+                    const i1 = calcWithLog("I_big", s_down, 0, z); // a=s_down, b=0
+                    stepLogs.push({ section: "左・上載荷重成分", desc, calcs: [i1] });
+                    I_total += i1.val;
+                }
+                else if (x >= X_ls) { 
+                    desc = "天端直下 (左肩～右肩の間)"; 
+                    flat = X_rs - x; s_down = W_sr; 
+                    // calculateSideContribution(0, 0, flat, s_down, z);
+                    const i1 = calcWithLog("I_big", s_down, flat, z);
+                    const i2 = calcWithLog("I_small", 0, 0, z, -1); // a=0 -> 0
+                    stepLogs.push({ section: "右側法面方向の寄与", desc, calcs: [i1] }); // i2は0なので省略
+                    I_total += i1.val;
+                }
+                else if (x >= X_lt) { 
+                    desc = "左法面上 (左尻～左肩の間)"; 
+                    s_up = X_ls - x; flat = W_top; s_down = W_sr; 
+                    // calculateSideContribution(0, s_up, flat, s_down, z);
+                    const i1 = calcWithLog("I_big (全体)", s_down, s_up + flat, z);
+                    const i2 = calcWithLog("I_small (除外)", s_up, 0, z, -1); // a=s_up, b=0
+                    stepLogs.push({ section: "右側全体の寄与", desc, calcs: [i1, i2] });
+                    I_total += (i1.val + i2.val);
+                }
+                else { 
+                    desc = "左法尻より左側"; 
+                    gap = X_lt - x; s_up = W_sl; flat = W_top; s_down = W_sr; 
+                    // calculateSideContribution(gap, s_up, flat, s_down, z);
+                    const i1 = calcWithLog("I_big (全体)", s_down, gap + s_up + flat, z);
+                    const i2 = calcWithLog("I_small (除外)", s_up, gap, z, -1);
+                    stepLogs.push({ section: "右側全体の寄与", desc, calcs: [i1, i2] });
+                    I_total += (i1.val + i2.val);
+                }
+            }
+
+            // 右側部分の寄与 (対称計算)
+            {
+                let gap = 0, s_up = 0, flat = 0, s_down = 0;
+                let desc = "";
+                if (x <= X_lt) { desc = "左法尻より左側 (影響なし)"; }
+                else if (x <= X_ls) { 
+                    desc = "左法面上"; 
+                    s_down = x - X_lt; 
+                    const i1 = calcWithLog("I_big", s_down, 0, z);
+                    stepLogs.push({ section: "左・上載荷重成分", desc, calcs: [i1] });
+                    I_total += i1.val;
+                }
+                else if (x <= X_rs) { 
+                    desc = "天端直下"; 
+                    flat = x - X_ls; s_down = W_sl; 
+                    const i1 = calcWithLog("I_big", s_down, flat, z);
+                    stepLogs.push({ section: "左側法面方向の寄与", desc, calcs: [i1] });
+                    I_total += i1.val;
+                }
+                else if (x <= X_rt) { 
+                    desc = "右法面上"; 
+                    s_up = x - X_rs; flat = W_top; s_down = W_sl; 
+                    const i1 = calcWithLog("I_big (全体)", s_down, s_up + flat, z);
+                    const i2 = calcWithLog("I_small (除外)", s_up, 0, z, -1);
+                    stepLogs.push({ section: "左側全体の寄与", desc, calcs: [i1, i2] });
+                    I_total += (i1.val + i2.val);
+                }
+                else { 
+                    desc = "右法尻より右側"; 
+                    gap = x - X_rt; s_up = W_sr; flat = W_top; s_down = W_sl; 
+                    const i1 = calcWithLog("I_big (全体)", s_down, gap + s_up + flat, z);
+                    const i2 = calcWithLog("I_small (除外)", s_up, gap, z, -1);
+                    stepLogs.push({ section: "左側全体の寄与", desc, calcs: [i1, i2] });
+                    I_total += (i1.val + i2.val);
+                }
+            }
+            
+            logs.push({ type: 'steps', content: stepLogs });
+            logs.push({ type: 'result', totalI: I_total, stress: I_total * q });
+
+            return logs;
+        }, [embankment, x, z, q]);
+
+        return (
+            <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 modal-overlay" onClick={onClose}>
+                <div className="bg-white rounded-lg shadow-2xl w-[700px] max-h-[90vh] flex flex-col modal-content" onClick={e => e.stopPropagation()}>
+                    <div className="p-4 border-b border-slate-200 bg-slate-50 rounded-t-lg flex justify-between items-center">
+                        <h2 className="text-lg font-bold text-slate-700 flex items-center gap-2">🧮 計算過程の詳細 (Point P)</h2>
+                        <button onClick={onClose} className="text-slate-400 hover:text-slate-600 font-bold text-xl">&times;</button>
+                    </div>
+                    <div className="p-6 overflow-y-auto text-slate-700 space-y-6 text-sm">
+                        
+                        {/* 1. 基本パラメータ */}
+                        <section>
+                            <h3 className="text-sm font-bold text-blue-800 border-b border-blue-200 mb-2 pb-1">1. 計算条件・幾何形状</h3>
+                            <div className="grid grid-cols-2 gap-x-8 gap-y-2 bg-slate-50 p-3 rounded border border-slate-200">
+                                {steps.find(s => s.type === 'header').content.map((item, idx) => (
+                                    <div key={idx} className="flex justify-between border-b border-slate-100 last:border-0 pb-1">
+                                        <span className="text-slate-500">{item.label}</span>
+                                        <span className="font-mono font-bold text-slate-700">{item.value}</span>
+                                    </div>
+                                ))}
+                            </div>
+                        </section>
+
+                        {/* 2. 計算式 */}
+                        <section>
+                            <h3 className="text-sm font-bold text-blue-800 border-b border-blue-200 mb-2 pb-1">2. 使用する基本式 (Osterberg)</h3>
+                            <div className="bg-white border border-slate-300 p-3 rounded text-center my-2">
+                                <img src="https://latex.codecogs.com/svg.image?I(a,b,z)=\frac{1}{\pi}\left[\frac{a+b}{a}\arctan\left(\frac{a+b}{z}\right)-\frac{b}{a}\arctan\left(\frac{b}{z}\right)\right]" alt="Formula" className="h-10 mx-auto" />
+                                <p className="text-xs text-slate-500 mt-2 text-left">
+                                    ※ 台形形状は複数の三角形分布荷重の重ね合わせとして計算されます。<br/>
+                                    ※ 下記の表における「項」は、上記式を用いて算出された影響係数 I です。
+                                </p>
+                            </div>
+                        </section>
+
+                        {/* 3. 計算詳細ステップ */}
+                        <section>
+                            <h3 className="text-sm font-bold text-blue-800 border-b border-blue-200 mb-2 pb-1">3. 影響係数の積算プロセス</h3>
+                            <div className="space-y-4">
+                                {steps.find(s => s.type === 'steps').content.map((step, idx) => (
+                                    <div key={idx} className="border border-slate-200 rounded overflow-hidden">
+                                        <div className="bg-slate-100 px-3 py-1.5 text-xs font-bold text-slate-700 border-b border-slate-200 flex justify-between">
+                                            <span>#{idx+1} {step.section}</span>
+                                            <span className="text-slate-500 font-normal">位置関係: {step.desc}</span>
+                                        </div>
+                                        <table className="w-full text-center text-xs">
+                                            <thead className="bg-slate-50 text-slate-500">
+                                                <tr>
+                                                    <th className="py-1 border-r border-slate-200">項 (Role)</th>
+                                                    <th className="py-1 border-r border-slate-200">a (m)</th>
+                                                    <th className="py-1 border-r border-slate-200">b (m)</th>
+                                                    <th className="py-1 border-r border-slate-200">z (m)</th>
+                                                    <th className="py-1">算出値 I</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody>
+                                                {step.calcs.map((c, cIdx) => (
+                                                    <tr key={cIdx} className="border-t border-slate-100 font-mono">
+                                                        <td className="py-1 border-r border-slate-200 text-slate-600">{c.name}</td>
+                                                        <td className="py-1 border-r border-slate-200">{c.a}</td>
+                                                        <td className="py-1 border-r border-slate-200">{c.b}</td>
+                                                        <td className="py-1 border-r border-slate-200">{c.z}</td>
+                                                        <td className={`py-1 font-bold ${c.sign < 0 ? 'text-red-600' : 'text-blue-600'}`}>
+                                                            {c.sign < 0 ? "- " : "+ "}{c.I}
+                                                        </td>
+                                                    </tr>
+                                                ))}
+                                            </tbody>
+                                        </table>
+                                    </div>
+                                ))}
+                            </div>
+                        </section>
+
+                        {/* 4. 最終結果 */}
+                        <section>
+                            <div className="bg-blue-50 border border-blue-200 rounded p-4 flex flex-col items-center">
+                                <div className="text-sm text-blue-800 mb-1">合計影響係数 <span className="font-mono font-bold">I_total = {steps.find(s => s.type === 'result').totalI.toFixed(6)}</span></div>
+                                <div className="text-lg font-bold text-blue-900 border-t border-blue-200 pt-2 mt-1 w-full text-center">
+                                    増加応力 ΔP = q × I_total = <span className="text-2xl">{steps.find(s => s.type === 'result').stress.toFixed(2)}</span> kN/m²
+                                </div>
+                            </div>
+                        </section>
+                    </div>
+                </div>
+            </div>
+        );
+    };
+
+    const SliderInput = ({ label, value, min, max, step, onChange, unit, theme = 'dark' }) => {
+        const isDark = theme === 'dark';
+        const labelColor = isDark ? "text-slate-200" : "text-slate-600";
+        const unitColor = isDark ? "text-slate-500" : "text-slate-400";
+        const inputBg = isDark ? "bg-slate-800 border-slate-600 text-white" : "bg-white border-slate-300 text-slate-700";
+        const sliderClass = isDark ? "dark-slider" : "light-slider";
+        
+        return (
+            <div className="w-full flex flex-col justify-center"> 
+                <div className="flex justify-between items-end mb-1 leading-none">
+                    <span className={`text-[11px] font-bold ${labelColor}`}>{label}</span>
+                    {unit && <span className={`text-[10px] ${unitColor}`}>{unit}</span>}
+                </div>
+                <div className="flex items-center gap-2 h-7">
+                    <input type="number" value={value} min={min} max={max} step={step} onChange={(e) => onChange(e.target.value)} className={`w-16 h-7 text-sm border rounded px-1 text-center focus:border-blue-500 outline-none ${inputBg}`} />
+                    <input type="range" className={`${sliderClass} flex-1 h-2`} min={min} max={max} step={step} value={value} onChange={(e) => onChange(e.target.value)} />
+                </div>
+            </div>
+        );
+    };
+
+    const Footer = () => {
+        const [isLegalOpen, setIsLegalOpen] = useState(false);
+        return (
+            <footer style={{ fontSize: '11px', textAlign: 'center', padding: '10px 20px', color: '#6c757d', backgroundColor: '#f8f9fa', borderTop: '1px solid #e9ecef', marginTop: '0px' }}>
+                <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '2em', marginBottom: '5px' }}>
+                    <p style={{ margin: 0 }}>最終更新日: 2025年12月7日</p>
+                    <div 
+                        onClick={() => setIsLegalOpen(!isLegalOpen)} 
+                        style={{ cursor: 'pointer', fontWeight: 'bold', padding: '5px', color: '#495057', userSelect: 'none' }}
+                    >
+                        免責事項 (クリックで表示)
+                    </div>
+                </div>
+                {isLegalOpen && (
+                    <div style={{ marginTop: '10px', borderTop: '1px solid #e9ecef', paddingTop: '10px', textAlign: 'left', maxWidth: '800px', marginLeft: 'auto', marginRight: 'auto', lineHeight: '1.5' }}>
+                        <p style={{ textAlign: 'center', fontWeight: 'bold', marginBottom: '5px' }}>
+                            Copyright &copy; 2025 (株)地圏総合コンサルタント All Rights Reserved.
+                        </p>
+                        <p style={{ fontSize: '10px', color: '#6c757d', textAlign: 'center', marginBottom: '10px' }}>
+                            Developed by: Naoya.Onozato
+                        </p>
+                        <p style={{ color: '#d9534f', fontWeight: 'bold', textAlign: 'center', backgroundColor: '#fff3cd', padding: '5px', border: '1px solid #ffc107', borderRadius: '4px', margin: '10px 0' }}>
+                            ⚠ 本システムの再配布・第三者への提供を禁止します。
+                        </p>
+                        <p style={{ marginBottom: '5px' }}>
+                            <strong>免責事項:</strong> 本システムの利用によって生じたいかなる損害についても、作成者は一切の責任を負いません。本ツールはあくまで補助的なものであり、計算結果は必ず専門技術者が確認・検証した上で使用してください。本システムが出力する値の正確性や完全性を保証するものではありません。
+                        </p>
+                        <p>
+                            <strong>使用ライブラリ:</strong> 本サービスは以下のオープンソースライブラリを使用しています:<br/>
+                            - <a href="https://react.dev/" target="_blank" className="text-blue-500 hover:underline">React</a>, 
+                            - <a href="https://recharts.org/" target="_blank" className="text-blue-500 hover:underline">Recharts</a> (Graph), 
+                            - <a href="https://handsontable.com/" target="_blank" className="text-blue-500 hover:underline">Handsontable</a> (Table), 
+                            - <a href="https://tailwindcss.com/" target="_blank" className="text-blue-500 hover:underline">Tailwind CSS</a>
+                        </p>
+                    </div>
+                )}
+            </footer>
+        );
+    };
+
+    const LayerEditorPanel = ({ layers, onApply, width }) => {
+        const containerRef = useRef(null);
+        const hotInstanceRef = useRef(null);
+        useEffect(() => { if (hotInstanceRef.current) hotInstanceRef.current.render(); }, [width]);
+        useEffect(() => {
+            if (containerRef.current) {
+                const tableData = layers.map(l => [l.depth, l.name, l.gamma, l.color.r, l.color.g, l.color.b, ""]);
+                while(tableData.length < 15) tableData.push([null, "", 18.0, 200, 200, 200, ""]);
+                containerRef.current.innerHTML = "";
+                const colorPreviewRenderer = (instance, td, row, col, prop, value, cellProperties) => {
+                    const r = parseInt(instance.getDataAtCell(row, 3)) || 200;
+                    const g = parseInt(instance.getDataAtCell(row, 4)) || 200;
+                    const b = parseInt(instance.getDataAtCell(row, 5)) || 200;
+                    td.style.backgroundColor = `rgb(${r}, ${g}, ${b})`; td.innerText = "";
+                };
+                hotInstanceRef.current = new Handsontable(containerRef.current, {
+                    data: tableData,
+                    colHeaders: ['深度<br>(m)', '地層名', '単体(飽和)γ<br>(kN/m³)', 'R', 'G', 'B', '色'],
+                    colWidths: [50, 70, 60, 35, 35, 35, 35],
+                    columns: [{ type: 'numeric', numericFormat: { pattern: '0.00' } }, { type: 'text' }, { type: 'numeric', numericFormat: { pattern: '0.00' } }, { type: 'numeric' }, { type: 'numeric' }, { type: 'numeric' }, { readOnly: true, renderer: colorPreviewRenderer }],
+                    rowHeaders: true, minSpareRows: 1, contextMenu: true, licenseKey: 'non-commercial-and-evaluation', height: '100%', width: '100%', stretchH: 'all', className: 'htCenter',
+                });
+            }
+            return () => { if (hotInstanceRef.current) hotInstanceRef.current.destroy(); };
+        }, []); 
+        const handleSave = () => {
+            if (!hotInstanceRef.current) return;
+            const rawData = hotInstanceRef.current.getData();
+            const newLayers = [];
+            let currentId = 1;
+            rawData.forEach(row => {
+                if (row[0] !== null && row[0] !== "" && !isNaN(parseFloat(row[0]))) {
+                    newLayers.push({
+                        id: currentId++, depth: parseFloat(row[0]), name: row[1] || `Layer ${currentId}`, gamma: parseFloat(row[2]) || 18.0,
+                        color: { r: row[3] !== null ? parseInt(row[3]) : 200, g: row[4] !== null ? parseInt(row[4]) : 200, b: row[5] !== null ? parseInt(row[5]) : 200 }
+                    });
+                }
+            });
+            newLayers.sort((a, b) => a.depth - b.depth);
+            onApply(newLayers);
+        };
+        return (
+            <div className="flex flex-col h-full bg-white shadow-lg z-10 flex-shrink-0">
+                <div className="p-3 bg-slate-50 border-b border-slate-200 flex justify-between items-center flex-shrink-0">
+                    <h3 className="text-sm font-bold text-slate-700">⛏️  地層データ</h3>
+                    <button onClick={handleSave} className="text-xs px-2 py-1 bg-blue-600 text-white rounded hover:bg-blue-700 shadow font-bold transition">更新</button>
+                </div>
+                <div className="flex-1 overflow-hidden relative bg-slate-50 p-2"><div ref={containerRef} className="h-full w-full overflow-hidden"></div></div>
+            </div>
+        );
+    };
+
+    const PcEditorPanel = ({ pcData, onApply, width }) => {
+        const containerRef = useRef(null);
+        const hotInstanceRef = useRef(null);
+        useEffect(() => { if (hotInstanceRef.current) hotInstanceRef.current.render(); }, [width]);
+        useEffect(() => {
+            if (containerRef.current) {
+                const tableData = pcData.map(d => [d.name, d.depth, d.layerName, d.pc]);
+                while(tableData.length < 10) tableData.push(["", null, "", null]);
+                containerRef.current.innerHTML = "";
+                hotInstanceRef.current = new Handsontable(containerRef.current, {
+                    data: tableData,
+                    colHeaders: ['試料名', '深度<br>(m)', '地層名', '圧密降伏応力(Pc)<br>(kN/m²)'],
+                    colWidths: [70, 60, 60, 70],
+                    columns: [{ type: 'text' }, { type: 'numeric', numericFormat: { pattern: '0.00' } }, { type: 'text' }, { type: 'numeric', numericFormat: { pattern: '0.00' } }],
+                    rowHeaders: true, minSpareRows: 1, contextMenu: true, licenseKey: 'non-commercial-and-evaluation', height: '100%', width: '100%', stretchH: 'all', className: 'htCenter',
+                });
+            }
+            return () => { if (hotInstanceRef.current) hotInstanceRef.current.destroy(); };
+        }, []);
+        const handleSave = () => {
+            if (!hotInstanceRef.current) return;
+            const rawData = hotInstanceRef.current.getData();
+            const newData = [];
+            let currentId = 1;
+            rawData.forEach(row => {
+                const depthVal = parseFloat(row[1]);
+                const pcVal = parseFloat(row[3]);
+                if (!isNaN(depthVal) && !isNaN(pcVal) && pcVal > 0) {
+                    newData.push({ id: currentId++, name: row[0] || "", depth: depthVal, layerName: row[2] || "", pc: pcVal });
+                }
+            });
+            onApply(newData);
+        };
+        return (
+            <div className="flex flex-col h-full bg-white shadow-lg z-10 flex-shrink-0 border-t border-slate-300">
+                <div className="p-3 bg-slate-50 border-b border-slate-200 flex justify-between items-center flex-shrink-0">
+                    <h3 className="text-sm font-bold text-slate-700">⏳ 圧密降伏応力 (Pc)</h3>
+                    <button onClick={handleSave} className="text-xs px-2 py-1 bg-blue-600 text-white rounded hover:bg-blue-700 shadow font-bold transition">更新</button>
+                </div>
+                <div className="flex-1 overflow-hidden relative bg-slate-50 p-2"><div ref={containerRef} className="h-full w-full overflow-hidden"></div></div>
+            </div>
+        );
+    };
+
+    const EmbankmentPreview = ({ topWidth, bottomWidth, height, calcX, calcZ, gwl, unitWeight }) => {
+        const [zoom, setZoom] = useState(1.0); 
+        const tW = parseFloat(topWidth) || 0; 
+        const bW = parseFloat(bottomWidth) || 0;
+        const h  = parseFloat(height) || 0;
+        const uW = parseFloat(unitWeight) || 0; 
+        const cX = parseFloat(calcX) || 0;
+        const cZ = parseFloat(calcZ) || 0;
+        const gwlDepth = parseFloat(gwl) || 0;
+        const qLoad = h * uW;
+        const svgW = 280; const svgH = 280; 
+        const centerX = svgW / 2; const groundY = 140;
+        const maxWidthM = Math.max(bW, tW, 40) + 10;
+        const baseScaleX = (svgW - 40) / maxWidthM;
+        const scaleX = baseScaleX * zoom; 
+        let scaleY = scaleX; 
+        const toPxX = (m) => centerX + m * scaleX;
+        const toPxY = (m_height) => groundY - m_height * scaleY; 
+        const toPxDepth = (m_depth) => groundY + m_depth * scaleY; 
+        const p1 = { x: toPxX(-tW / 2), y: toPxY(h) }; const p2 = { x: toPxX(tW / 2),  y: toPxY(h) }; 
+        const p3 = { x: toPxX(bW / 2),  y: toPxY(0) }; const p4 = { x: toPxX(-bW / 2), y: toPxY(0) }; 
+        const pPoint = { x: toPxX(cX), y: toPxDepth(cZ) };
+        const gwlY = toPxDepth(gwlDepth); 
+        const dimTopY = p1.y - 10; const dimBotY = groundY + 15;
+        
+        return (
+            <div className="w-full bg-white rounded-lg border border-slate-400 mb-2 overflow-hidden relative shadow-md">
+                <div className="absolute top-2 left-2 text-sm font-bold text-slate-700 z-10">モデル断面図</div>
+                <svg width="100%" height={svgH} viewBox={`0 0 ${svgW} ${svgH}`} className="bg-white">
+                    <defs><pattern id="grid" width="20" height="20" patternUnits="userSpaceOnUse"><path d="M 20 0 L 0 0 0 20" fill="none" stroke="#e2e8f0" strokeWidth="1"/></pattern></defs>
+                    <rect width="100%" height="100%" fill="url(#grid)" />
+                    <line x1="0" y1={groundY} x2={svgW} y2={groundY} stroke="#475569" strokeWidth="1.5" />
+                    <line x1={centerX} y1={10} x2={centerX} y2={svgH - 10} stroke="#cbd5e1" strokeDasharray="4 2" strokeWidth="1" />
+                    <polygon points={`${p1.x},${p1.y} ${p2.x},${p2.y} ${p3.x},${p3.y} ${p4.x},${p4.y}`} fill="#ffedd5" stroke="#f97316" strokeWidth="2" />
+                    {h > 0 && (<text x={centerX} y={toPxY(h / 2)} textAnchor="middle" dominantBaseline="middle" fill="#9a3412" fontSize="12" fontWeight="bold">Δqs = {qLoad.toFixed(1)} kN/m²</text>)}
+                    <line x1={p1.x} y1={dimTopY} x2={p2.x} y2={dimTopY} stroke="#64748b" strokeWidth="1"/>
+                    <line x1={p1.x} y1={dimTopY-3} x2={p1.x} y2={p1.y} stroke="#64748b" strokeWidth="1"/>
+                    <line x1={p2.x} y1={dimTopY-3} x2={p2.x} y2={p2.y} stroke="#64748b" strokeWidth="1"/>
+                    <text x={centerX} y={dimTopY - 4} textAnchor="middle" fill="#334155" fontSize="11" fontWeight="bold">天端 {tW}m</text>
+                    <line x1={p4.x} y1={dimBotY} x2={p3.x} y2={dimBotY} stroke="#64748b" strokeWidth="1"/>
+                    <line x1={p4.x} y1={dimBotY+3} x2={p4.x} y2={p4.y} stroke="#64748b" strokeWidth="1"/>
+                    <line x1={p3.x} y1={dimBotY+3} x2={p3.x} y2={p3.y} stroke="#64748b" strokeWidth="1"/>
+                    <text x={centerX} y={dimBotY + 12} textAnchor="middle" fill="#334155" fontSize="11" fontWeight="bold">底部 {bW}m</text>
+                    <text x={svgW - 5} y={p1.y + (groundY - p1.y)/2} textAnchor="end" fill="#334155" fontSize="11">H={h}m</text>
+                    {gwlDepth > 0 && gwlDepth < 100 && (<><line x1="0" y1={gwlY} x2={svgW} y2={gwlY} stroke="#3b82f6" strokeWidth="1.5" strokeDasharray="5 2" /><text x={svgW - 5} y={gwlY - 4} textAnchor="end" fill="#3b82f6" fontSize="10" fontWeight="bold">地下水位</text></>)}
+                    <line x1={centerX} y1={pPoint.y} x2={pPoint.x} y2={pPoint.y} stroke="#ef4444" strokeDasharray="3 3" strokeWidth="1.5"/>
+                    <line x1={pPoint.x} y1={groundY} x2={pPoint.x} y2={pPoint.y} stroke="#ef4444" strokeDasharray="3 3" strokeWidth="1.5"/>
+                    <circle cx={pPoint.x} cy={pPoint.y} r="3.5" fill="#ef4444" />
+                    <text x={pPoint.x + 8} y={pPoint.y} fill="#ef4444" fontSize="12" fontWeight="bold" alignmentBaseline="middle">P</text>
+                </svg>
+                <div className="absolute bottom-2 left-2 right-2 bg-white/80 p-1 rounded flex items-center gap-2 border border-slate-200 backdrop-blur-sm">
+                    <span className="text-[10px] text-slate-600 font-bold whitespace-nowrap">🔍 表示倍率</span>
+                    <input type="range" min="0.5" max="5.0" step="0.1" value={zoom} onChange={(e) => setZoom(parseFloat(e.target.value))} className="dark-slider w-full h-1.5"/>
+                    <span className="text-[10px] text-slate-600 w-8 text-right">{zoom.toFixed(1)}x</span>
+                </div>
+            </div>
+        );
+    };
+
+    // ==========================================
+    //  SmartPcDot & Popup
+    // ==========================================
+    
+    const PopupContent = ({ x, y, payload, offset, onMouseDown }) => {
+        const p0 = payload.p0 ? payload.p0.toFixed(2) : "-";
+        const dP = payload.dP ? payload.dP.toFixed(2) : "-";
+        const total = payload.total ? payload.total.toFixed(2) : "-";
+        const pc = payload.pc ? payload.pc.toFixed(2) : "-";
+        const depth = payload.depth ? payload.depth.toFixed(2) : "-";
+        const name = payload.pcName || "-";
+        const boxWidth = 190;
+        const lineHeight = 18;
+        const boxHeight = 115;
+        const padding = 10;
+        const boxX = x + 15;
+        const boxY = y - 10; 
+
+        return (
+            <g style={{ zIndex: 9999 }} transform={`translate(${offset.x}, ${offset.y})`} onMouseDown={(e) => onMouseDown(e, payload.pcId)} className="draggable-popup">
+                <rect x={boxX+3} y={boxY+3} width={boxWidth} height={boxHeight} rx="5" fill="rgba(0,0,0,0.3)" />
+                <rect x={boxX} y={boxY} width={boxWidth} height={boxHeight} rx="5" fill="white" stroke="#cbd5e1" strokeWidth="1" />
+                <text x={boxX + padding} y={boxY + padding + 5} fontSize="12" fontWeight="bold" fill="#334155" dominantBaseline="hanging">{name} (GL -{depth} m)</text>
+                <text x={boxX + padding} y={boxY + padding + 5 + lineHeight} fontSize="11" fill="#64748b" dominantBaseline="hanging">有効上載圧 P0 : {p0}</text>
+                <text x={boxX + padding} y={boxY + padding + 5 + lineHeight*2} fontSize="11" fill="#ef4444" dominantBaseline="hanging">増加応力 ΔP : {dP}</text>
+                <text x={boxX + padding} y={boxY + padding + 5 + lineHeight*3} fontSize="11" fontWeight="bold" fill="#2563eb" dominantBaseline="hanging">合計応力 : {total}</text>
+                <line x1={boxX + padding} y1={boxY + padding + lineHeight*4 + 4} x2={boxX + boxWidth - padding} y2={boxY + padding + lineHeight*4 + 4} stroke="#e2e8f0" strokeWidth="1" />
+                <text x={boxX + padding} y={boxY + padding + 5 + lineHeight*4 + 6} fontSize="11" fontWeight="bold" fill="#10b981" dominantBaseline="hanging">圧密降伏応力 Pc : {pc}</text>
+            </g>
+        );
+    };
+
+    const SmartPcDot = (props) => {
+        const { cx, cy, payload, onDotClick, selectedIds, popupOffsets, onPopupMouseDown, fill, stroke: propStroke } = props; 
+        if (!Number.isFinite(cx) || !Number.isFinite(cy) || !payload) return null;
+        
+        const isSelected = selectedIds.includes(payload.pcId);
+        const r = isSelected ? 8 : (props.r || 5);
+        const dotFill = fill || "#10b981";
+        const strokeColor = isSelected ? "#064e3b" : (propStroke || "#333333");
+        const strokeWidth = isSelected ? 2 : 1; 
+
+        const handleClick = (e) => {
+            e.stopPropagation();
+            e.preventDefault();
+            onDotClick(payload.pcId);
+        };
+        const currentOffset = popupOffsets[payload.pcId] || { x: 0, y: 0 };
+        return (
+            <g>
+                <circle cx={cx} cy={cy} r={r} fill={dotFill} stroke={strokeColor} strokeWidth={strokeWidth} className="clickable-dot" onClick={handleClick} />
+                {isSelected && (<PopupContent x={cx} y={cy} payload={payload} offset={currentOffset} onMouseDown={onPopupMouseDown} />)}
+            </g>
+        );
+    };
+
+    // ==========================================
+    //  OCR・過圧密量グラフコンポーネント
+    // ==========================================
+    const OcrAnalysisPanel = ({ results, layers, graphConfig, yTicks, onDotClick, selectedIds, popupOffsets, onPopupMouseDown }) => {
+        
+        const scatterData = useMemo(() => {
+            return results.data
+                .filter(d => d.pc !== null)
+                .map(d => {
+                    const layer = layers.find(l => d.depth <= l.depth) || layers[layers.length - 1];
+                    return {
+                        ...d,
+                        margin: d.pc - d.p0,        
+                        ocr: d.p0 > 0 ? d.pc / d.p0 : 0, 
+                        fill: `rgb(${layer.color.r}, ${layer.color.g}, ${layer.color.b})`,
+                        stroke: `rgb(${Math.max(0, layer.color.r - 100)}, ${Math.max(0, layer.color.g - 100)}, ${Math.max(0, layer.color.b - 100)})`
+                    };
+                });
+        }, [results.data, layers]);
+
+        // 目盛りの計算
+        const marginTicks = useMemo(() => {
+            const ticks = [];
+            for(let i=graphConfig.marginMin; i<=graphConfig.marginMax; i+=graphConfig.marginStep) ticks.push(i);
+            return ticks;
+        }, [graphConfig.marginMin, graphConfig.marginMax, graphConfig.marginStep]);
+
+        const ocrTicks = useMemo(() => {
+            const ticks = [];
+            for(let i=0; i<=graphConfig.ocrMax; i+=graphConfig.ocrStep) ticks.push(i);
+            return ticks;
+        }, [graphConfig.ocrMax, graphConfig.ocrStep]);
+
+        const renderBackgroundLayers = () => layers.map((layer, index) => {
+            const prevDepth = index === 0 ? 0 : layers[index - 1].depth;
+            const endDepth = index === layers.length - 1 ? 1000 : layer.depth;
+            if (prevDepth >= graphConfig.yMax) return null;
+            return (
+                <ReferenceArea key={`bg-${layer.id}`} y1={prevDepth} y2={Math.min(endDepth, graphConfig.yMax)} 
+                    fill={`rgb(${layer.color.r},${layer.color.g},${layer.color.b})`} fillOpacity={0.15} 
+                />
+            );
+        });
+
+        const CustomTooltip = ({ active, payload }) => {
+            if (active && payload && payload.length) {
+                const data = payload[0].payload;
+                return (
+                    <div className="bg-white p-2 border border-slate-300 shadow-lg rounded opacity-90" style={{zIndex:100, fontSize: graphConfig.tooltipSize}}>
+                        <p className="font-bold mb-1">{data.pcName} (GL -{data.depth}m)</p>
+                        <p>Pc: {data.pc.toFixed(1)}</p>
+                        <p>P0: {data.p0.toFixed(1)}</p>
+                        <hr className="my-1 border-slate-200"/>
+                        <p className="text-blue-600 font-bold">Pc - P0: {data.margin.toFixed(1)} kN/m²</p>
+                        <p className="text-purple-600 font-bold">OCR: {data.ocr.toFixed(2)}</p>
+                    </div>
+                );
+            }
+            return null;
+        };
+
+        const activeLayers = layers.filter((l, idx) => {
+             const prevDepth = idx === 0 ? 0 : layers[idx-1].depth;
+             return prevDepth < graphConfig.yMax;
+        });
+
+        const axisStyle = { fontSize: graphConfig.tickSize };
+        const labelStyle = { fontSize: graphConfig.axisLabelSize, fill: '#64748b' };
+        
+        const Y_AXIS_WIDTH = 45;
+        const MARGINS = { top: 10, right: 10, bottom: 5, left: 0 }; 
+
+        return (
+            <div className="flex flex-col h-full gap-2">
+                
+                {/* 凡例ヘッダー */}
+                <div className="flex-shrink-0 bg-white border border-slate-200 rounded p-1.5 flex flex-wrap gap-2 items-center justify-center shadow-sm" style={{fontSize: graphConfig.legendSize}}>
+                    <span className="font-bold mr-1">プロット凡例:</span>
+                    {activeLayers.map(layer => (
+                        <div key={layer.id} className="flex items-center gap-1">
+                            <span className="w-2.5 h-2.5 rounded-full border border-slate-300" style={{backgroundColor: `rgb(${layer.color.r},${layer.color.g},${layer.color.b})`}}></span>
+                            <span>{layer.name}</span>
+                        </div>
+                    ))}
+                </div>
+
+                {/* 上側: 過圧密量 (Pc - P0) */}
+                <div className="flex-1 border border-slate-200 rounded-lg bg-white p-1 flex flex-col relative shadow-sm min-h-0">
+                    <h4 className="font-bold text-center text-slate-600 mb-1" style={{fontSize: graphConfig.axisLabelSize}}>過圧密量 Pc-P0 (kN/m²)</h4>
+                    <div className="flex-1 min-h-0">
+                        <ResponsiveContainer width="100%" height="100%">
+                            <ScatterChart layout="vertical" margin={MARGINS}>
+                                {renderBackgroundLayers()}
+                                <CartesianGrid strokeDasharray="3 3" stroke={VISUAL_CONFIG.gridStroke} />
+                                <XAxis type="number" dataKey="margin" domain={[graphConfig.marginMin, graphConfig.marginMax]} ticks={marginTicks} tick={{...axisStyle, stroke: VISUAL_CONFIG.axisStroke, strokeWidth:0.5}} tickLine={{ stroke: VISUAL_CONFIG.axisStroke }} stroke={VISUAL_CONFIG.axisStroke} />
+                                <YAxis 
+                                    type="number" 
+                                    dataKey="depth" 
+                                    reversed={false} 
+                                    domain={[0, graphConfig.yMax]} 
+                                    ticks={yTicks}
+                                    tick={{...axisStyle, stroke: VISUAL_CONFIG.axisStroke, strokeWidth:0.5}} 
+                                    tickLine={{ stroke: VISUAL_CONFIG.axisStroke }}
+                                    width={Y_AXIS_WIDTH}
+                                    tickMargin={5}
+                                    label={{ value: '深度 (m)', angle: -90, position: 'insideLeft', offset: 0, style: {textAnchor: 'middle'}, ...labelStyle }} 
+                                    stroke={VISUAL_CONFIG.axisStroke} 
+                                />
+                                <ReferenceLine x={0} stroke="#64748b" strokeWidth={1} />
+                                <Tooltip content={<CustomTooltip />} cursor={{strokeDasharray: '3 3'}} />
+                                <Scatter 
+                                    data={scatterData} 
+                                    shape={(props) => (
+                                        <SmartPcDot 
+                                            {...props} 
+                                            r={graphConfig.markerSize}
+                                            onDotClick={onDotClick}
+                                            selectedIds={selectedIds}
+                                            popupOffsets={popupOffsets}
+                                            onPopupMouseDown={onPopupMouseDown}
+                                            fill={props.payload.fill} 
+                                        />
+                                    )}
+                                    isAnimationActive={false}
+                                />
+                            </ScatterChart>
+                        </ResponsiveContainer>
+                    </div>
+                </div>
+
+                {/* 下側: OCR (Pc / P0) */}
+                <div className="flex-1 border border-slate-200 rounded-lg bg-white p-1 flex flex-col relative shadow-sm min-h-0">
+                    <h4 className="font-bold text-center text-slate-600 mb-1" style={{fontSize: graphConfig.axisLabelSize}}>過圧密比 OCR (Pc/P0)</h4>
+                    <div className="flex-1 min-h-0">
+                        <ResponsiveContainer width="100%" height="100%">
+                            <ScatterChart layout="vertical" margin={MARGINS}>
+                                {renderBackgroundLayers()}
+                                <CartesianGrid strokeDasharray="3 3" stroke={VISUAL_CONFIG.gridStroke} />
+                                <XAxis type="number" dataKey="ocr" domain={[0, graphConfig.ocrMax]} ticks={ocrTicks} tick={{...axisStyle, stroke: VISUAL_CONFIG.axisStroke, strokeWidth:0.5}} tickLine={{ stroke: VISUAL_CONFIG.axisStroke }} stroke={VISUAL_CONFIG.axisStroke} />
+                                <YAxis 
+                                    type="number" 
+                                    dataKey="depth" 
+                                    reversed={false} 
+                                    domain={[0, graphConfig.yMax]} 
+                                    ticks={yTicks}
+                                    tick={{...axisStyle, stroke: VISUAL_CONFIG.axisStroke, strokeWidth:0.5}} 
+                                    tickLine={{ stroke: VISUAL_CONFIG.axisStroke }}
+                                    width={Y_AXIS_WIDTH}
+                                    tickMargin={5}
+                                    stroke={VISUAL_CONFIG.axisStroke} 
+                                />
+                                
+                                <ReferenceLine x={1} stroke="#ef4444" strokeWidth={1.5} label={{ value: '正規圧密(1.0)', position: 'insideTopRight', fontSize: graphConfig.tickSize, fill: '#ef4444', angle: -90, offset: 10 }} />
+                                <ReferenceLine x={2} stroke="#f59e0b" strokeDasharray="3 3" />
+
+                                <Tooltip content={<CustomTooltip />} cursor={{strokeDasharray: '3 3'}} />
+                                <Scatter 
+                                    data={scatterData} 
+                                    shape={(props) => (
+                                        <SmartPcDot 
+                                            {...props} 
+                                            r={graphConfig.markerSize}
+                                            onDotClick={onDotClick}
+                                            selectedIds={selectedIds}
+                                            popupOffsets={popupOffsets}
+                                            onPopupMouseDown={onPopupMouseDown}
+                                            fill={props.payload.fill}
+                                        />
+                                    )}
+                                    isAnimationActive={false}
+                                />
+                            </ScatterChart>
+                        </ResponsiveContainer>
+                    </div>
+                    {/* OCR区分表 */}
+                    <div className="mt-1 border-t border-slate-100 pt-1 px-2 pb-1">
+                         <div className="text-slate-600 grid grid-cols-2 gap-x-2 gap-y-0.5 border border-slate-200 bg-slate-50 p-1 rounded" style={{fontSize: Math.max(9, graphConfig.legendSize - 1)}}>
+                             <div className="flex justify-between"><span className="font-medium">OCR ≒ 1.0</span><span>正規圧密</span></div>
+                             <div className="flex justify-between"><span className="font-medium">OCR ≒ 2~8</span><span>過圧密地盤</span></div>
+                             <div className="flex justify-between"><span className="font-medium">OCR 1.0~2.0</span><span>軽い過圧密</span></div>
+                             <div className="flex justify-between"><span className="font-medium">OCR &gt; 8</span><span>強い過圧密</span></div>
+                         </div>
+                    </div>
+                </div>
+            </div>
+        );
+    };
+
+    // ==========================================
+    //  Main App
+    // ==========================================
+
+    const App = () => {
+        const [embankment, setEmbankment] = useState({
+            topWidth: 20, bottomWidth: 50, height: 8, unitWeight: 18, calcX: 2.0, calcZ: 12.0
+        });
+        const [gwl, setGwl] = useState(1.0);
+        const [layers, setLayers] = useState([
+            { id: 1, depth: 1.0, name: 'Bc2', gamma: 18.00, color: {r:209, g:175, b:117} },
+            { id: 2, depth: 3.0, name: 'Bs2', gamma: 18.00, color: {r:238, g:188, b:145} },
+            { id: 3, depth: 6.0, name: 'Bc1', gamma: 17.50, color: {r:217, g:189, b:140} },
+            { id: 4, depth: 9.0, name: 'As1', gamma: 16.00, color: {r:247, g:252, b:161} },
+            { id: 5, depth: 14.0, name: 'Ac1', gamma: 15.50, color: {r:108, g:249, b:249} },
+            { id: 6, depth: 25.0, name: 'Dc',  gamma: 19.00, color: {r:150, g:150, b:150} }
+        ]);
+        const [pcData, setPcData] = useState([
+            { id: 1, name: 'B-1', depth: 4.5, layerName: 'Bc1', pc: 90 },
+            { id: 2, name: 'B-2', depth: 7.5, layerName: 'As1', pc: 120 },
+            { id: 3, name: 'B-3', depth: 11.0, layerName: 'Ac1', pc: 160 },
+            { id: 4, name: 'B-4', depth: 13.0, layerName: 'Ac1', pc: 170 },
+        ]);
+        
+        const [editorWidth, setEditorWidth] = useState(450);
+        const [isHelpOpen, setIsHelpOpen] = useState(false);
+        const [isSettingsOpen, setIsSettingsOpen] = useState(false);
+        const [isCalcDetailOpen, setIsCalcDetailOpen] = useState(false); // NEW
+
+        // グラフ設定
+        const [graphConfig, setGraphConfig] = useState({
+            xMax: 500,       // 応力最大
+            yMax: 30,        // 深度最大
+            xStep: 20,       // 応力ステップ
+            yStep: 2,        // 深度ステップ
+            showPcPlot: true, 
+            markerSize: 5,
+            
+            // 過圧密量設定
+            marginMin: -50,
+            marginMax: 200,
+            marginStep: 50,
+            
+            // OCR設定
+            ocrMax: 10,
+            ocrStep: 1,
+
+            // フォント設定
+            axisLabelSize: 16,
+            tickSize: 14,
+            legendSize: 12,
+            tooltipSize: 14
+        });
+
+        const [selectedPcIds, setSelectedPcIds] = useState([]);
+        const [popupOffsets, setPopupOffsets] = useState({});
+        const [dragState, setDragState] = useState(null);
+        const fileInputRef = useRef(null);
+
+        const xTicks = useMemo(() => {
+            const ticks = [];
+            for(let i=0; i<=graphConfig.xMax; i+=graphConfig.xStep) ticks.push(i);
+            return ticks;
+        }, [graphConfig.xMax, graphConfig.xStep]);
+
+        const yTicks = useMemo(() => {
+            const ticks = [];
+            const max = graphConfig.yMax;
+            const step = graphConfig.yStep;
+            // 浮動小数点誤差対策 (0.1刻みなどでずれないようにする)
+            if (step <= 0) return [0, max];
+            for(let i = 0; i <= max + (step * 0.01); i += step) {
+                ticks.push(parseFloat(i.toFixed(2)));
+            }
+            if (ticks.length > 0 && ticks[0] !== 0) ticks.unshift(0);
+            return ticks;
+        }, [graphConfig.yMax, graphConfig.yStep]);
+
+        const autoMaxDepth = useMemo(() => {
+            const bottom = layers.length > 0 ? layers[layers.length - 1].depth : 20;
+            return Math.ceil(Math.max(bottom, 20)); 
+        }, [layers]);
+
+        const calcMaxDepth = Math.max(autoMaxDepth, graphConfig.yMax);
+
+        const handleEmbChange = (key, val) => {
+            let v = parseFloat(val);
+            if (isNaN(v)) v = 0;
+            setEmbankment(prev => ({ ...prev, [key]: v }));
+        };
+
+        const handleLayerUpdate = (newLayers) => { if (newLayers.length > 0) setLayers(newLayers); };
+        const handlePcUpdate = (newData) => { setPcData(newData); };
+        
+        const togglePcSelection = useCallback((id) => {
+            setSelectedPcIds(prev => {
+                if (prev.includes(id)) {
+                    return prev.filter(pid => pid !== id);
+                } else {
+                    return [...prev, id];
+                }
+            });
+        }, []);
+
+        const handlePopupMouseDown = (e, id) => {
+            e.stopPropagation();
+            e.preventDefault();
+            const currentOffset = popupOffsets[id] || { x: 0, y: 0 };
+            setDragState({
+                id: id,
+                startX: e.clientX,
+                startY: e.clientY,
+                originX: currentOffset.x,
+                originY: currentOffset.y
+            });
+        };
+
+        useEffect(() => {
+            const handleMouseMove = (e) => {
+                if (!dragState) return;
+                const dx = e.clientX - dragState.startX;
+                const dy = e.clientY - dragState.startY;
+                setPopupOffsets(prev => ({
+                    ...prev,
+                    [dragState.id]: { x: dragState.originX + dx, y: dragState.originY + dy }
+                }));
+            };
+            const handleMouseUp = () => { setDragState(null); };
+            if (dragState) {
+                window.addEventListener('mousemove', handleMouseMove);
+                window.addEventListener('mouseup', handleMouseUp);
+            }
+            return () => {
+                window.removeEventListener('mousemove', handleMouseMove);
+                window.removeEventListener('mouseup', handleMouseUp);
+            };
+        }, [dragState]);
+
+        const startResizing = useCallback((mouseDownEvent) => {
+            mouseDownEvent.preventDefault();
+            const startX = mouseDownEvent.clientX;
+            const startWidth = editorWidth;
+            const onMouseMove = (mouseMoveEvent) => {
+                const newWidth = startWidth + (mouseMoveEvent.clientX - startX);
+                if (newWidth >= 200 && newWidth <= 800) setEditorWidth(newWidth);
+            };
+            const onMouseUp = () => {
+                document.removeEventListener('mousemove', onMouseMove);
+                document.removeEventListener('mouseup', onMouseUp);
+                document.body.style.cursor = 'default';
+                window.dispatchEvent(new Event('resize'));
+            };
+            document.addEventListener('mousemove', onMouseMove);
+            document.addEventListener('mouseup', onMouseUp);
+            document.body.style.cursor = 'col-resize';
+        }, [editorWidth]);
+
+       const results = useMemo(() => {
+            const q = embankment.height * embankment.unitWeight;
+            const data = [];
+            let depths = new Set();
+            for (let z = 0; z <= calcMaxDepth; z += 0.5) depths.add(z);
+            layers.forEach(l => depths.add(l.depth));
+            if(gwl > 0 && gwl < calcMaxDepth) depths.add(gwl);
+            depths.add(embankment.calcZ);
+            pcData.forEach(p => { if(p.pc && p.depth && !isNaN(p.depth)) depths.add(p.depth); });
+            const sortedDepths = Array.from(depths).sort((a, b) => a - b);
+            
+            sortedDepths.forEach(z => {
+                const p0 = calculateGeostaticStress(z, layers, gwl);
+                const dP = calculateExactStress(embankment.calcX, embankment.topWidth, embankment.bottomWidth, q, z);
+                const pcMatch = pcData.find(p => Math.abs(p.depth - z) < 0.001 && parseFloat(p.pc) > 0);
+                
+                data.push({
+                    depth: parseFloat(z.toFixed(2)),
+                    p0: parseFloat(p0.toFixed(2)),
+                    dP: parseFloat(dP.toFixed(2)),
+                    total: parseFloat((p0 + dP).toFixed(2)),
+                    pc: pcMatch ? parseFloat(pcMatch.pc) : null,
+                    pcName: pcMatch ? pcMatch.name : null,
+                    pcId: pcMatch ? pcMatch.id : null
+                });
+            });
+            const dP_point = calculateExactStress(embankment.calcX, embankment.topWidth, embankment.bottomWidth, q, embankment.calcZ);
+            return { data, q, pointResult: { z: embankment.calcZ, dP: dP_point } };
+        }, [embankment, layers, gwl, calcMaxDepth, pcData, graphConfig.yMax]);
+
+        const downloadCSV = () => {
+            const now = new Date();
+            const fileName = `土中応力計算結果_${now.getFullYear()}${String(now.getMonth()+1).padStart(2,'0')}${String(now.getDate()).padStart(2,'0')}.csv`;
+            const q = embankment.height * embankment.unitWeight;
+            let csvContent = "\uFEFFDepth(m),Layer,P0(kN/m2),dP(kN/m2),Total(kN/m2)\n";
+            for (let z = 0; z <= calcMaxDepth; z += 0.1) {
+                const layer = layers.find(l => z <= l.depth) || layers[layers.length - 1];
+                const p0 = calculateGeostaticStress(z, layers, gwl);
+                const dP = calculateExactStress(embankment.calcX, embankment.topWidth, embankment.bottomWidth, q, z);
+                csvContent += `${z.toFixed(2)},${layer?layer.name:"-"},${p0.toFixed(3)},${dP.toFixed(3)},${(p0+dP).toFixed(3)}\n`;
+            }
+            const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+            const link = document.createElement("a");
+            link.href = URL.createObjectURL(blob);
+            link.download = fileName;
+            link.click();
+        };
+
+        const handleSaveJson = () => {
+            const blob = new Blob([JSON.stringify({ embankment, layers, gwl, pcData, graphConfig }, null, 2)], { type: "application/json" });
+            const link = document.createElement("a");
+            link.href = URL.createObjectURL(blob);
+
+            // 日時を取得してファイル名を生成
+            const now = new Date();
+            const yyyy = now.getFullYear();
+            const mo = String(now.getMonth() + 1).padStart(2, '0'); // 月 (0埋め)
+            const dd = String(now.getDate()).padStart(2, '0');      // 日 (0埋め)
+            const hh = String(now.getHours()).padStart(2, '0');     // 時 (0埋め)
+            const mi = String(now.getMinutes()).padStart(2, '0');   // 分 (0埋め)
+
+            // 例: 土中応力_20251207_1805.json
+            link.download = `土中応力_${yyyy}${mo}${dd}_${hh}${mi}.json`;
+            
+            link.click();
+        };
+
+        const handleLoadJson = (e) => {
+            const file = e.target.files[0];
+            if (!file) return;
+            const reader = new FileReader();
+            reader.onload = (ev) => {
+                try {
+                    const data = JSON.parse(ev.target.result);
+                    if(data.embankment) setEmbankment(data.embankment);
+                    if(data.layers) setLayers(data.layers);
+                    if(data.gwl !== undefined) setGwl(data.gwl);
+                    if(data.pcData) setPcData(data.pcData);
+                    if(data.graphConfig) setGraphConfig(data.graphConfig);
+                } catch(err) { alert("JSON読み込みエラー"); }
+            };
+            reader.readAsText(file);
+            e.target.value = ''; 
+        };
+
+        const GRAPH_MARGINS = { top: 30, right: 30, left: 10, bottom: 10 }; 
+        const XAXIS_HEIGHT = 45;
+
+        // フォント設定スタイルの準備
+        const axisStyle = { fontSize: graphConfig.tickSize };
+        const labelStyle = { fontSize: graphConfig.axisLabelSize, fontWeight: 'bold', fill:'#64748b' };
+        const legendWrapperStyle = { fontSize: `${graphConfig.legendSize}px` };
+
+        return (
+            <div className="flex h-screen w-full bg-slate-100 overflow-hidden text-sm">
+                <HelpModal isOpen={isHelpOpen} onClose={() => setIsHelpOpen(false)} />
+                <GraphSettingsModal 
+                    isOpen={isSettingsOpen} 
+                    onClose={() => setIsSettingsOpen(false)} 
+                    config={graphConfig} 
+                    setConfig={setGraphConfig} 
+                />
+                <CalculationDetailModal 
+                    isOpen={isCalcDetailOpen} 
+                    onClose={() => setIsCalcDetailOpen(false)} 
+                    embankment={embankment}
+                    calcX={embankment.calcX}
+                    calcZ={embankment.calcZ}
+                />
+
+                {/* === LEFT SIDEBAR === */}
+                <div className="w-80 flex-shrink-0 bg-[#1e293b] text-slate-300 flex flex-col border-r border-slate-700 shadow-xl z-20">
+                    <div className="p-2 border-b border-slate-700 bg-[#0f172a] flex justify-between items-center">
+                        <h1 className="text-lg font-bold text-white flex items-center gap-2">
+                            <span className="text-blue-500">◈</span> 土中応力計算ツール
+                        </h1>
+                        <button onClick={() => setIsHelpOpen(true)} className="text-slate-400 hover:text-white transition" title="ヘルプ">
+                           <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><path d="M12 17h.01"/></svg>
+                        </button>
+                    </div>
+
+                    <div className="flex-1 overflow-y-auto p-4 custom-scrollbar">
+                        <div className="mb-2 bg-[#334155] p-3 rounded-lg border border-slate-600">
+                            <div className="text-xs font-bold text-slate-200 mb-2 border-b border-slate-500 pb-1">データ入出力</div>
+                            <div className="grid grid-cols-2 gap-2 mb-2">
+                                <button onClick={handleSaveJson} className="flex items-center justify-center gap-1 bg-emerald-600 hover:bg-emerald-700 text-white py-1.5 px-2 rounded text-xs font-bold transition"><span>💾 保存(JSON)</span></button>
+                                <button onClick={() => fileInputRef.current.click()} className="flex items-center justify-center gap-1 bg-orange-600 hover:bg-orange-700 text-white py-1.5 px-2 rounded text-xs font-bold transition"><span>📂 読込</span></button>
+                                <input type="file" ref={fileInputRef} onChange={handleLoadJson} accept=".json" className="hidden" />
+                            </div>
+                            <button onClick={downloadCSV} className="w-full bg-blue-600 hover:bg-blue-700 text-white py-1.5 px-2 rounded text-xs font-bold transition flex items-center justify-center gap-1"><span>📄 CSV保存 (計算結果)</span></button>
+                        </div>
+                        <div className="mb-2">
+                            <div className="text-xs font-bold text-slate-200 uppercase tracking-wider mb-2">盛土形状・条件パラメータ</div>
+                            <EmbankmentPreview {...embankment} gwl={gwl} />
+                            <div className="bg-[#334155] p-2 rounded-lg border border-slate-600">
+                                <div className="grid grid-cols-1 gap-2">
+                                    <SliderInput label="天端幅" unit="m" min={0} max={100} step={0.5} value={embankment.topWidth} onChange={v => handleEmbChange('topWidth', v)} />
+                                    <SliderInput label="底面幅" unit="m" min={0} max={100} step={0.5} value={embankment.bottomWidth} onChange={v => handleEmbChange('bottomWidth', v)} />
+                                </div>
+                                <div className="grid grid-cols-2 gap-3 mt-2 mb-1">
+                                    <div><label className="block text-xs mb-0.5 text-slate-200">高さ(m)</label><input type="number" step="0.1" value={embankment.height} onChange={e=>handleEmbChange('height', e.target.value)} className="w-full bg-slate-800 border border-slate-600 rounded px-1 py-1 text-center text-white focus:border-blue-500 outline-none" /></div>
+                                    <div><label className="block text-xs mb-0.5 text-slate-200">単体(飽和)γ</label><input type="number" step="0.5" value={embankment.unitWeight} onChange={e=>handleEmbChange('unitWeight', e.target.value)} className="w-full bg-slate-800 border border-slate-600 rounded px-1 py-1 text-center text-white focus:border-blue-500 outline-none" /></div>
+                                </div>
+                            </div>
+                        </div>
+                        <div className="space-y-2">
+                            <div><div className="text-xs font-bold text-slate-200 uppercase tracking-wider mb-1">水位条件</div><div className="bg-[#334155] p-2 rounded-lg border border-slate-600"><SliderInput label="地下水位 (GL -m)" unit="m" min={0} max={calcMaxDepth} step={0.1} value={gwl} onChange={v => setGwl(parseFloat(v))} /></div></div>
+                            <div><div className="text-xs font-bold text-slate-200 uppercase tracking-wider mb-1">計算位置設定</div><div className="bg-[#334155] p-2 rounded-lg border border-slate-600"><SliderInput label="水平位置 x" unit="m" min={-Math.max(50, embankment.bottomWidth)} max={Math.max(50, embankment.bottomWidth)} step={0.5} value={embankment.calcX} onChange={v => handleEmbChange('calcX', v)} /><SliderInput label="深さ z" unit="m" min={0} max={calcMaxDepth} step={0.5} value={embankment.calcZ} onChange={v => handleEmbChange('calcZ', v)} /></div></div>
+                            
+                            <div className="bg-blue-900/30 border border-blue-800 rounded p-2 mt-4 flex items-center justify-between gap-1">
+    <div className="text-xs text-slate-200 flex items-center gap-2 flex-shrink-0">
+        <span>点Pの増加応力</span>
+        <button 
+            onClick={() => setIsCalcDetailOpen(true)}
+            className="px-1.5 py-0.5 bg-blue-600 hover:bg-blue-500 text-white text-[10px] rounded border border-blue-400 shadow transition flex items-center gap-1 whitespace-nowrap"
+            title="計算過程を見る"
+        >
+            <span>🧮 詳細</span>
+        </button>
+    </div>
+    <div className="flex items-baseline text-right whitespace-nowrap">
+        <span className="text-xl font-bold text-slate-100 leading-none tracking-tight">{results.pointResult.dP.toFixed(2)}</span>
+        <span className="text-xs text-slate-300 font-normal ml-1">kN/m²</span>
+    </div>
+</div>
+                        </div>
+                    </div>
+                </div>
+
+                {/* === MIDDLE PANEL (Split View) === */}
+                <div className="flex flex-col h-full bg-slate-50 shadow-lg z-10 flex-shrink-0" style={{ width: editorWidth }}>
+                    <div className="flex-1 min-h-0 relative"><LayerEditorPanel layers={layers} onApply={handleLayerUpdate} width={editorWidth} /></div>
+                    <div className="flex-1 min-h-0 relative"><PcEditorPanel pcData={pcData} onApply={handlePcUpdate} width={editorWidth} /></div>
+                </div>
+                <div className="w-2 bg-slate-200 hover:bg-blue-400 cursor-col-resize flex-shrink-0 z-20 flex items-center justify-center transition-colors" onMouseDown={startResizing} title="ドラッグして幅を調整"><div className="h-8 w-1 border-l border-r border-slate-400"></div></div>
+
+                {/* === RIGHT PANEL (Graph) === */}
+                <div className="flex-1 flex flex-col min-w-0 bg-white light-scroll relative overflow-hidden">
+                    <div className="flex-1 flex flex-col p-4 pb-0 overflow-y-auto">
+                        <div className="flex items-center justify-between mb-3 flex-shrink-0">
+                            <div>
+                                <h2 className="text-lg font-bold text-slate-700">📉 土中応力・過圧密計算</h2>
+                                <div className="text-slate-500 text-xs mt-0.5">計算位置: x=<span className="font-bold text-slate-800">{embankment.calcX}m</span>, 地下水位=<span className="font-bold text-blue-600">{gwl}m</span></div>
+                            </div>
+                            <button onClick={() => setIsSettingsOpen(true)} className="flex items-center gap-2 bg-slate-100 hover:bg-slate-200 text-slate-600 px-3 py-1.5 rounded-lg border border-slate-300 transition shadow-sm">
+                                <span className="text-lg">⚙️</span>
+                                <span className="text-xs font-bold">グラフ設定</span>
+                            </button>
+                        </div>
+                        
+                        {/* === グラフエリア（左右分割） === */}
+                        <div className="flex-1 flex flex-row gap-3 min-h-0"> 
+                            
+                            {/* 左側: メイン応力グラフ (幅 7/12) */}
+                            <div className="w-7/12 flex border border-slate-200 rounded-xl p-2 bg-white shadow-sm relative overflow-hidden h-full">
+                                <div className="flex-1 min-w-0 h-full">
+                                    <ResponsiveContainer width="100%" height="100%">
+                                        <ComposedChart layout="vertical" data={results.data} margin={GRAPH_MARGINS}>
+                                            {layers.map((layer, index) => {
+                                                const prevDepth = index === 0 ? 0 : layers[index - 1].depth;
+                                                const endDepth = index === layers.length - 1 ? 1000 : layer.depth;
+                                                if (prevDepth >= graphConfig.yMax) return null;
+                                                const brightness = (layer.color.r * 299 + layer.color.g * 587 + layer.color.b * 114) / 1000;
+                                                return (<ReferenceArea key={`bg-${layer.id}`} y1={prevDepth} y2={Math.min(endDepth, graphConfig.yMax)} fill={`rgb(${layer.color.r},${layer.color.g},${layer.color.b})`} fillOpacity={0.15}>
+                                                    <Label value={layer.name} position="insideLeft" offset={10} fill={brightness > 128 ? '#1e293b' : '#f8fafc'} angle={-90} style={{ fontSize: '11px', fontWeight: 'bold', textShadow: '0 0 3px rgba(255,255,255,0.5)' }} />
+                                                </ReferenceArea>);
+                                            })}
+                                            {/* 視認性向上のためのグリッドと軸色変更 */}
+                                            <CartesianGrid strokeDasharray="3 3" stroke={VISUAL_CONFIG.gridStroke} />
+                                            <XAxis type="number" dataKey="x" position="top" orientation="top" height={XAXIS_HEIGHT} domain={[0, graphConfig.xMax]} ticks={xTicks} label={{ value: '応力 (kN/m²)', position: 'top', offset: 10, ...labelStyle }} tick={{...axisStyle, stroke: VISUAL_CONFIG.axisStroke, strokeWidth:0.5}} tickLine={{ stroke: VISUAL_CONFIG.axisStroke }} stroke={VISUAL_CONFIG.axisStroke} />
+                                            <YAxis dataKey="depth" type="number" reversed={false} domain={[0, graphConfig.yMax]} allowDataOverflow ticks={yTicks} label={{ value: '深度 (m)', angle: -90, position: 'insideLeft', dx: 10, ...labelStyle }} tick={{...axisStyle, stroke: VISUAL_CONFIG.axisStroke, strokeWidth:0.5}} tickLine={{ stroke: VISUAL_CONFIG.axisStroke }} stroke={VISUAL_CONFIG.axisStroke} />
+                                            <ZAxis dataKey="name" name="試料名" />
+                                            <Tooltip cursor={{ strokeDasharray: '3 3' }} contentStyle={{ fontSize: graphConfig.tooltipSize, borderRadius: '6px', border: 'none', boxShadow:'0 4px 6px -1px rgba(0,0,0,0.1)' }} formatter={(val, name) => [typeof val === 'number' ? val.toFixed(2) : val, name]} labelFormatter={(label) => `GL -${label} m`} />
+                                            <Legend verticalAlign="bottom" height={36} iconSize={10} wrapperStyle={legendWrapperStyle} formatter={(value) => <span style={{ color: value === "圧密降伏応力 Pc" ? "#10b981" : "#374151", fontWeight: value === "圧密降伏応力 Pc" ? "bold" : "normal", marginLeft: '4px' }}>{value}</span>} />
+                                            <ReferenceLine y={gwl} stroke="#3b82f6" strokeDasharray="3 3" label={{ position: 'insideBottomRight', value: '地下水位', fill: '#3b82f6', fontSize: graphConfig.tickSize, fontWeight:'bold' }} />
+                                            <ReferenceLine y={embankment.calcZ} stroke="#ef4444" strokeDasharray="3 3" />
+                                            <Area dataKey="p0" type="monotone" fill="#94a3b8" fillOpacity={0.2} stroke="#64748b" name="有効上載圧 P0" strokeWidth={2} isAnimationActive={false} />
+                                            <Line dataKey="dP" type="monotone" stroke="#ef4444" strokeWidth={2} name="増加応力 ΔP" dot={false} strokeDasharray="5 5" isAnimationActive={false} />
+                                            <Line dataKey="total" type="monotone" stroke="#2563eb" strokeWidth={3} name="合計応力 (P0 + ΔP)" dot={false} isAnimationActive={false} />
+                                            
+                                            {graphConfig.showPcPlot && (
+                                                <Line 
+                                                    dataKey="pc" 
+                                                    name="圧密降伏応力 Pc" 
+                                                    stroke="#10b981" 
+                                                    strokeWidth={0}
+                                                    dot={
+                                                        <SmartPcDot 
+                                                            r={graphConfig.markerSize} 
+                                                            onDotClick={togglePcSelection} 
+                                                            selectedIds={selectedPcIds}
+                                                            popupOffsets={popupOffsets}
+                                                            onPopupMouseDown={handlePopupMouseDown}
+                                                            fill="#10b981"
+                                                        />
+                                                    }
+                                                    activeDot={false}
+                                                    isAnimationActive={false} 
+                                                    legendType="circle"
+                                                />
+                                            )}
+                                        </ComposedChart>
+                                    </ResponsiveContainer>
+                                </div>
+                            </div>
+
+                            {/* 右側: OCR/Margin分析 (幅 5/12) */}
+                            <div className="w-5/12 h-full">
+                                <OcrAnalysisPanel 
+                                    results={results} 
+                                    layers={layers} 
+                                    graphConfig={graphConfig} 
+                                    yTicks={yTicks}
+                                    onDotClick={togglePcSelection}
+                                    selectedIds={selectedPcIds}
+                                    popupOffsets={popupOffsets}
+                                    onPopupMouseDown={handlePopupMouseDown}
+                                />
+                            </div>
+
+                        </div>
+                    </div>
+                    <Footer />
+                </div>
+            </div>
+        );
+    };
+
+    const root = ReactDOM.createRoot(document.getElementById('root'));
+    root.render(<App />);
+</script>
+</body>
+</html>
